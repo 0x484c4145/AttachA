@@ -51,7 +51,8 @@ namespace art {
     }
 }
 #if PLATFORM_WINDOWS
-#include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 
 namespace art {
     namespace interrupt {

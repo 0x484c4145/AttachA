@@ -526,7 +526,7 @@ namespace art {
                                     Type_as_ValueMeta<method_info::return_type>(),
                                     ([&]() -> list_array<ValueMeta> {
                                         list_array<ValueMeta> args;
-                                        args.reserve_push_back(method_info::arguments_count);
+                                        args.reserve_back(method_info::arguments_count);
                                         tuple_to_ValueMeta<method_info::arguments_type, method_info::arguments_count>(args);
                                         return args;
                                     }())};

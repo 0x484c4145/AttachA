@@ -4,8 +4,8 @@
 // (See accompanying file LICENSE or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef SRC_RUN_TIME_TASKS_UTIL_SIGNALS
-#define SRC_RUN_TIME_TASKS_UTIL_SIGNALS
+#ifndef SRC_RUN_TIME_TASKS_UTIL_INTERRUPT
+#define SRC_RUN_TIME_TASKS_UTIL_INTERRUPT
 
 //Virtualized signals for windows and proxy for posix signals
 //  implements only timer signals
@@ -36,4 +36,4 @@ namespace art {
     }
 }
 
-#endif /* SRC_RUN_TIME_TASKS_UTIL_SIGNALS */
+#endif /* SRC_RUN_TIME_TASKS_UTIL_INTERRUPT */

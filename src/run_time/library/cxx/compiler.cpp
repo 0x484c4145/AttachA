@@ -182,8 +182,7 @@ namespace art {
                 if (compiler_item == format_compiler.end())
                     throw std::runtime_error("Compiler for format " + format + " not registered");
 
-                auto compiler = compiler_item->second;
-                return compiler.get();
+                return compiler_item->second.get();
             } else if (browser.is_folder()) {
                 throw std::runtime_error("Folder decoding not implemented");
             } else {

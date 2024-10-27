@@ -111,7 +111,8 @@
         "buffer": "cpp",
         "executor": "cpp",
         "io_context": "cpp",
-        "socket": "cpp"
+        "socket": "cpp",
+        "stdfloat": "cpp"
     },
 	"cmake.configureOnOpen": true,
     "C/C++ Include Guard.Auto Update Include Guard": true,
@@ -119,11 +120,6 @@
     "C_Cpp.errorSquiggles": "enabled",
     "todo-tree.tree.scanMode": "workspace",
     "workbench.editor.wrapTabs": true,
-
-
-    "vscode_custom_css.imports": [
-        "file:///D:/progs/visual_studio_code_css/tabs.css"
-    ],
     "C_Cpp.clang_format_style": "file",
     "[cpp]": {
         "editor.formatOnPaste": true,

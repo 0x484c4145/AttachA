@@ -16,8 +16,9 @@ namespace art {
             art::hash<T> h;
             if (t.blocks_more(1)) {
                 size_t result = 0;
-                for (size_t i = 0; i < t.size(); i++)
-                    result = art::mur_combine(result, h(t[i]));
+                t.for_each([&](const auto& it) {
+                    result = art::mur_combine(result, h(it));
+                });
                 return result;
             } else
                 return h(t.data(), t.size());

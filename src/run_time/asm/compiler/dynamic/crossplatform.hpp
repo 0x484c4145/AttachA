@@ -8,6 +8,7 @@
 
 namespace art {
     void _inlineReleaseUnused(CASM& a, creg64 reg);
+    void _inlineUseResult(CASM& a, creg64 reg);
 
     //only once included in run_time/asm/compiler.cpp
     void Compiler::DynamicCompiler::noting() {
@@ -458,9 +459,9 @@ namespace art {
         }
         b.lea_valindex({compiler.static_map, compiler.values}, value);
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(size_t, ValueItem&&)) & list_array<ValueItem>::insert);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, ValueItem&&)&)&list_array<ValueItem>::insert);
         else
-            b.finalize((void(list_array<ValueItem>::*)(size_t, const ValueItem&)) & list_array<ValueItem>::insert);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const ValueItem&)&)&list_array<ValueItem>::insert);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::push_end(const ValueIndexPos& value) {
@@ -472,9 +473,9 @@ namespace art {
         b.mov_valindex({compiler.static_map, compiler.values}, array);
         b.lea_valindex({compiler.static_map, compiler.values}, value);
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(ValueItem&&)) & list_array<ValueItem>::push_back);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(ValueItem&&)&)&list_array<ValueItem>::push_back);
         else
-            b.finalize((void(list_array<ValueItem>::*)(const ValueItem&)) & list_array<ValueItem>::push_back);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(const ValueItem&)&)&list_array<ValueItem>::push_back);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::push_start(const ValueIndexPos& value) {
@@ -486,124 +487,32 @@ namespace art {
         b.mov_valindex({compiler.static_map, compiler.values}, array);
         b.lea_valindex({compiler.static_map, compiler.values}, value);
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(ValueItem&&)) & list_array<ValueItem>::push_front);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(ValueItem&&)&)&list_array<ValueItem>::push_front);
         else
-            b.finalize((void(list_array<ValueItem>::*)(const ValueItem&)) & list_array<ValueItem>::push_front);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(const ValueItem&)&)&list_array<ValueItem>::push_front);
     }
 
-    void Compiler::DynamicCompiler::ArrayOperation::insert_range(const ValueIndexPos& array2, const ValueIndexPos& index, const ValueIndexPos& from2, const ValueIndexPos& to2) {
+    void Compiler::DynamicCompiler::ArrayOperation::insert_range(const ValueIndexPos& array2, const ValueIndexPos& index) {
         BuildCall b(compiler.a, 1);
         b.lea_valindex({compiler.static_map, compiler.values}, array);
         b.finalize(AsArr);
         b.lea_valindex({compiler.static_map, compiler.values}, array2);
         b.finalize(AsArr);
-        if (to2.pos == ValuePos::in_constants && from2.pos == ValuePos::in_constants && index.pos == ValuePos::in_constants) {
-            b.setArguments(5);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(3);
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(compiler.get_size_constant(index));
             b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (to2.pos == ValuePos::in_constants && from2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr);
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (to2.pos == ValuePos::in_constants && index.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index));
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(resr);
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (from2.pos == ValuePos::in_constants && index.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index));
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(resr);
-        } else if (to2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0);
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr);
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            compiler.a.pop();
-            compiler.a.pop(resr);
-            b.addArg(resr);
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (from2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0);
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr); // index
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2)); // from
-            compiler.a.pop();
-            compiler.a.pop(resr);
-            b.addArg(resr); // to
-        } else if (index.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0);
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index)); //index
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(resr); // from
-            compiler.a.pop();
-            compiler.a.pop(resr);
-            b.addArg(resr); // to
         } else {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0);
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-            compiler.a.pop();
-            compiler.a.push(resr);
             b.lea_valindex({compiler.static_map, compiler.values}, index);
             b.finalize(getSize);
 
-            b.setArguments(5);
+            b.setArguments(3);
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr); // index
             b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            compiler.a.pop(resr);
-            b.addArg(resr); // from
-            compiler.a.pop(resr);
-            b.addArg(resr); // to
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, const list_array<ValueItem>&, size_t, size_t)) & list_array<ValueItem>::insert);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const list_array<ValueItem>&)&)&list_array<ValueItem>::insert);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::get(const ValueIndexPos& index, const ValueIndexPos& set) {
@@ -800,7 +709,7 @@ namespace art {
         b.lea_valindex({compiler.static_map, compiler.values}, array);
         b.finalize(AsArr);
         b.mov_valindex({compiler.static_map, compiler.values}, array);
-        b.finalize(&list_array<ValueItem>::pop_back);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)()&)&list_array<ValueItem>::pop_back);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::pop_start() {
@@ -808,7 +717,7 @@ namespace art {
         b.lea_valindex({compiler.static_map, compiler.values}, array);
         b.finalize(AsArr);
         b.mov_valindex({compiler.static_map, compiler.values}, array);
-        b.finalize(&list_array<ValueItem>::pop_front);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)()&)&list_array<ValueItem>::pop_front);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::remove_item(const ValueIndexPos& index) {
@@ -827,7 +736,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::remove);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t)&)&list_array<ValueItem>::erase);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::remove_range(const ValueIndexPos& from, const ValueIndexPos& to) {
@@ -870,7 +779,7 @@ namespace art {
             compiler.a.pop(resr);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, size_t)) & list_array<ValueItem>::remove);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, size_t)&)&list_array<ValueItem>::erase);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::resize(const ValueIndexPos& new_size) {
@@ -890,7 +799,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::resize);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t)&)&list_array<ValueItem>::resize);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::resize_default(const ValueIndexPos& new_size, const ValueIndexPos& default_value) {
@@ -912,7 +821,7 @@ namespace art {
             b.addArg(resr);
             b.lea_valindex({compiler.static_map, compiler.values}, default_value);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, const ValueItem&)) & list_array<ValueItem>::resize);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const ValueItem&)&)&list_array<ValueItem>::resize);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::reserve_push_end(const ValueIndexPos& count) {
@@ -932,7 +841,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize(&list_array<ValueItem>::reserve_push_back);
+        b.finalize(&list_array<ValueItem>::reserve_back);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::reserve_push_start(const ValueIndexPos& count) {
@@ -952,7 +861,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize(&list_array<ValueItem>::reserve_push_front);
+        b.finalize(&list_array<ValueItem>::reserve_front);
     }
 
     void Compiler::DynamicCompiler::ArrayOperation::commit() {
@@ -1051,7 +960,7 @@ namespace art {
             throw NullPointerException();
         class_ptr->getAsync();
         list_array<ValueItem> args_tmp;
-        args_tmp.reserve_push_back(len + 1);
+        args_tmp.reserve_back(len + 1);
         args_tmp.push_back(ValueItem(*class_ptr, as_reference));
         for (uint32_t i = 0; i < len; i++)
             args_tmp.push_back(ValueItem(args[i], as_reference));
@@ -1064,7 +973,7 @@ namespace art {
             throw NullPointerException();
         class_ptr->getAsync();
         list_array<ValueItem> args_tmp;
-        args_tmp.reserve_push_back(len + 1);
+        args_tmp.reserve_back(len + 1);
         args_tmp.push_back(ValueItem(*class_ptr, as_reference));
         for (uint32_t i = 0; i < len; i++)
             args_tmp.push_back(ValueItem(args[i], as_reference));
@@ -1620,5 +1529,207 @@ namespace art {
     void Compiler::DynamicCompiler::remove_qualifiers(const ValueIndexPos& value) {
         from_gc(value);
         remove_const_protect(value);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::set(const ValueIndexPos& index, const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexMapSetMoveStatic : helper_functions::IndexMapSetCopyStatic);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::get(const ValueIndexPos& index, const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, set);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, set);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexMapGetMoveStatic : helper_functions::IndexMapGetCopyStatic);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::contains(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexMapContainsStatic);
+        helper_functions::intrinsics::store_bool_from_resr(compiler.a);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::remove_item(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(compiler.get_size_constant(index));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexMapRemoveStatic);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::reserve(const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        if (value.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(compiler.get_size_constant(value));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+        }
+        b.finalize(helper_functions::IndexMapReserveStatic);
+    }
+
+    void Compiler::DynamicCompiler::MapOperation::size(const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(AsMap);
+        b.setArguments(2);
+        b.lea_valindex({compiler.static_map, compiler.values}, set);
+        b.mov_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(helper_functions::IndexMapSizeStatic);
+    }
+
+    void Compiler::DynamicCompiler::SetOperation::set(const ValueIndexPos& index, const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(AsSet);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(3);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexSetSetMoveStatic : helper_functions::IndexSetSetCopyStatic);
+    }
+
+    void Compiler::DynamicCompiler::SetOperation::contains(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(AsSet);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexSetContainsStatic);
+        helper_functions::intrinsics::store_bool_from_resr(compiler.a);
+    }
+
+    void Compiler::DynamicCompiler::SetOperation::remove_item(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(AsSet);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexSetRemoveStatic);
+    }
+
+    void Compiler::DynamicCompiler::SetOperation::reserve(const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(AsSet);
+        if (value.pos == ValuePos::in_constants) {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(value));
+        } else {
+            b.setArguments(2);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+        }
+        b.finalize(helper_functions::IndexSetReserveStatic);
+    }
+
+    void Compiler::DynamicCompiler::SetOperation::size(const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 1);
+        b.lea_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(AsSet);
+        b.setArguments(2);
+        b.lea_valindex({compiler.static_map, compiler.values}, set);
+        b.mov_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(helper_functions::IndexSetSizeStatic);
+    }
+
+    void Compiler::DynamicCompiler::global_get(const ValueIndexPos& from, const ValueIndexPos& location, const ValueIndexPos& separator) {
+        if (location.pos == ValuePos::in_constants && separator.pos == ValuePos::in_constants) {
+            BuildCall b(compiler.a, 3);
+            b.addArg(&attacha_environment::get_value_globals());
+            b.addArg(compiler.get_string_constant(location));
+            b.addArg(compiler.get_string_constant(separator));
+            b.finalize(values_global::find_value_local_auto_join);
+            b.setArguments(2);
+            b.lea_valindex({compiler.static_map, compiler.values}, from);
+            b.addArg(resr);
+            b.finalize(getValueItem);
+        } else
+            throw InvalidArguments("`location` and `separator` must be a constants");
+    }
+
+    void Compiler::DynamicCompiler::global_set(const ValueIndexPos& to, const ValueIndexPos& location, const ValueIndexPos& separator) {
+        if (location.pos == ValuePos::in_constants && separator.pos == ValuePos::in_constants) {
+            BuildCall b(compiler.a, 3);
+            b.addArg(&attacha_environment::get_value_globals());
+            b.addArg(compiler.get_string_constant(location));
+            b.addArg(compiler.get_string_constant(separator));
+            b.finalize(values_global::find_value_local_auto_join);
+            b.setArguments(2);
+            b.lea_valindex({compiler.static_map, compiler.values}, to);
+            b.addArg(resr);
+            b.finalize(getValueItem);
+        } else
+            throw InvalidArguments("`location` and `separator` must be a constants");
     }
 }

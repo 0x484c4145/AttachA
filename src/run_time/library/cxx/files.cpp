@@ -8,7 +8,9 @@
 
 #include <attacha/configuration/compatibility.hpp>
 #include <run_time/AttachA_CXX.hpp>
+#include <run_time/asm/attacha_environment.hpp>
 #include <run_time/library/cxx/files.hpp>
+#include <run_time/library/file.hpp>
 #include <run_time/tasks.hpp>
 #include <run_time/tasks/util/native_workers_singleton.hpp>
 #include <util/exceptions.hpp>
@@ -38,6 +40,7 @@ namespace art {
 }
 
 #if PLATFORM_WINDOWS
+    #define NOMINMAX
     #include <Windows.h>
     #include <io.h>
     #include <winternl.h>
@@ -1824,8 +1827,10 @@ namespace art {
                             else
                                 _file_creation->async_notify(args);
                         } else {
+                            auto old = states[info->FileId.QuadPart].full_path;
                             states[info->FileId.QuadPart].current = allocated_info;
                             states[info->FileId.QuadPart].full_path = name;
+                            args = {old, name};
                             if (is_folder)
                                 _folder_name_change->async_notify(args);
                             else
@@ -2159,6 +2164,8 @@ namespace art {
                 CXX::Interface::direct_method("get_event_file_security_change", funs_FolderChangesMonitorImpl_get_event_file_security_change)
             );
             CXX::Interface::typeVTable<typed_lgr<FolderChangesMonitorImpl>>() = define_FolderChangesMonitor;
+            define_FolderChangesMonitor->getAfterMethods()->constructor = new FuncEnvironment(art::file::constructor::createProxy_FolderChangesMonitor);
+            attacha_environment::get_types_global().join_namespace({"file", "folder_changes_monitor"})->value = define_FolderChangesMonitor;
         }
 
         ValueItem createFolderChangesMonitor(const char* path, size_t length, bool depth) {
@@ -4167,6 +4174,8 @@ namespace art {
                 CXX::Interface::direct_method("get_event_file_security_change", funs_FolderChangesMonitorImpl_get_event_file_security_change)
             );
             CXX::Interface::typeVTable<typed_lgr<FolderChangesMonitorImpl>>() = define_FolderChangesMonitor;
+            define_FolderChangesMonitor->getAfterMethods()->constructor = new FuncEnvironment(art::file::constructor::createProxy_FolderChangesMonitor);
+            attacha_environment::get_types_global().join_namespace({"file", "folder_changes_monitor"})->value = define_FolderChangesMonitor;
         }
 
         ValueItem createFolderChangesMonitor(const char* path, size_t length, bool depth) {

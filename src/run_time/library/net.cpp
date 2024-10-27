@@ -5,6 +5,7 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #include <run_time/AttachA_CXX.hpp>
+#include <run_time/asm/attacha_environment.hpp>
 #include <run_time/library/cxx/networking.hpp>
 
 namespace art {
@@ -236,6 +237,10 @@ namespace art {
                     timeout_ms = (int32_t)args[1];
                 return new ValueItem(Ai::constructStructure<typed_lgr<udp_socket>>(define_UdpSocket, new udp_socket(ip_port, timeout_ms)));
             }
+
+            ValueItem* createProxy_TcpConfiguration(ValueItem*, uint32_t) {
+                return new ValueItem(construct_TcpConfiguration());
+            }
         }
 
         ValueItem* ipv6_supported(ValueItem*, uint32_t) {
@@ -299,6 +304,12 @@ namespace art {
             CXX::Interface::typeVTable<typed_lgr<TcpNetworkServer>>() = define_TcpNetworkServer;
             CXX::Interface::typeVTable<typed_lgr<TcpClientSocket>>() = define_TcpClientSocket;
             CXX::Interface::typeVTable<typed_lgr<files::BlockingFileHandle>>() = define_UdpSocket;
+            define_TcpNetworkServer->getAfterMethods()->constructor = new FuncEnvironment(net::constructor::createProxy_TcpServer);
+            define_TcpClientSocket->getAfterMethods()->constructor = new FuncEnvironment(net::tcp_client_connect);
+            define_UdpSocket->getAfterMethods()->constructor = new FuncEnvironment(net::constructor::createProxy_UdpSocket);
+            attacha_environment::get_types_global().join_namespace({"nat", "tcp_server"})->value = define_TcpNetworkServer;
+            attacha_environment::get_types_global().join_namespace({"nat", "tcp_client"})->value = define_TcpClientSocket;
+            attacha_environment::get_types_global().join_namespace({"nat", "udp_socket"})->value = define_UdpSocket;
         }
     }
 }

@@ -25,8 +25,9 @@ namespace art {
     size_t light_stack::max_buffer_size = configuration::tasks::light_stack::max_buffer_size;
 }
 #if PLATFORM_WINDOWS
-#include <Windows.h>
-#include <intrin.h> //_AddressOfReturnAddress
+    #define NOMINMAX
+    #include <Windows.h>
+    #include <intrin.h> //_AddressOfReturnAddress
 
 namespace art {
     stack_context create_stack(size_t size) {

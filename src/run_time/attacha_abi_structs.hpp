@@ -110,12 +110,9 @@ namespace art {
 
         global_get,
         global_set,
-        global_take,
-        global_move,
-        global_copy_to_constants,
-        global_copy_to_static,
-        global_reference_to_constants,
-        global_reference_to_static
+
+        map_op,
+        set_op,
     );
 
     ENUM_t(
@@ -149,7 +146,28 @@ namespace art {
         commit,
         decommit,
         remove_reserved,
-        size
+        size,
+    );
+
+    ENUM_t(
+        OpcodeMap,
+        uint8_t,
+        set,
+        get,
+        contains,
+        remove_item,
+        reserve,
+        size,
+    );
+
+    ENUM_t(
+        OpcodeSet,
+        uint8_t,
+        set,
+        contains,
+        remove_item,
+        reserve,
+        size,
     );
 
     ENUM_t(
@@ -296,7 +314,7 @@ namespace art {
         ui64,
         flo,
         doub,
-        //character,//char32utf32,  TO-DO
+        character, //utf32 char
         raw_arr_i8,
         raw_arr_i16,
         raw_arr_i32,
@@ -415,7 +433,7 @@ namespace art {
         bool in_debug : 1;
         bool run_time_computable : 1; //in files always false
         bool is_patchable : 1;        //define function is patchable or not, if not patchable, in function header and footer excluded atomic usage count modification
-                                      //10bits left
+                                      //10 bits left
     };
 
     union ValueMeta {
@@ -562,6 +580,8 @@ namespace art {
         ValueItem(uint64_t val);
         ValueItem(float val);
         ValueItem(double val);
+
+        ValueItem(char32_t ch);
     #ifdef _WIN32
         ValueItem(long val)
             : ValueItem(int32_t(val)) {}
@@ -681,6 +701,7 @@ namespace art {
         ValueItem(uint64_t& val, as_reference_t);
         ValueItem(float& val, as_reference_t);
         ValueItem(double& val, as_reference_t);
+        ValueItem(char32_t& ch, as_reference_t);
         ValueItem(class Structure*, as_reference_t);
         ValueItem(art::ustring& val, as_reference_t);
         ValueItem(list_array<ValueItem>& val, as_reference_t);
@@ -707,6 +728,7 @@ namespace art {
         ValueItem(const uint64_t& val, as_reference_t);
         ValueItem(const float& val, as_reference_t);
         ValueItem(const double& val, as_reference_t);
+        ValueItem(const char32_t& ch, as_reference_t);
         ValueItem(const class Structure*, as_reference_t);
         ValueItem(const art::ustring& val, as_reference_t);
         ValueItem(const list_array<ValueItem>& val, as_reference_t);
@@ -817,6 +839,7 @@ namespace art {
         explicit operator uint64_t() const;
         explicit operator float() const;
         explicit operator double() const;
+        explicit operator char32_t() const;
     #ifdef _WIN32
         explicit operator long() const {
             return (long)(int32_t) * this;
@@ -1166,6 +1189,8 @@ namespace art {
         //	art::shared_ptr<FuncEnvironment> holder_destructor;
         //	art::shared_ptr<FuncEnvironment> holder_copy;
         //	art::shared_ptr<FuncEnvironment> holder_move;
+        //	art::shared_ptr<FuncEnvironment> holder_compare;
+        //	art::shared_ptr<FuncEnvironment> holder_constructor;
         //  art::ustring name;
         //	list_array<StructureTag>* tags;//can be null
         //}
@@ -1193,7 +1218,7 @@ namespace art {
         uint64_t getMethodIndex(const art::ustring& name, ClassAccess access) const;
         bool hasMethod(const art::ustring& name, ClassAccess access) const;
 
-        static AttachAVirtualTable* create(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy);
+        static AttachAVirtualTable* create(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy, art::shared_ptr<FuncEnvironment> constructor = nullptr);
         static void destroy(AttachAVirtualTable* table);
 
         art::ustring getName() const;
@@ -1238,11 +1263,12 @@ namespace art {
             art::shared_ptr<FuncEnvironment> copy;
             art::shared_ptr<FuncEnvironment> move;
             art::shared_ptr<FuncEnvironment> compare;
+            art::shared_ptr<FuncEnvironment> constructor; //can be null, used only for reflection
         };
 
         MethodInfo* getMethodsInfo() const;
         ValueInfo* getValuesInfo() const;
-        AttachAVirtualTable(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy);
+        AttachAVirtualTable(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, art::shared_ptr<FuncEnvironment> constructor, size_t structure_bytes, bool allow_auto_copy);
         ~AttachAVirtualTable();
 
     public:
@@ -1255,6 +1281,8 @@ namespace art {
         art::shared_ptr<FuncEnvironment> copy;       //args: Structure* dst, Structure* src, bool at_construct
         art::shared_ptr<FuncEnvironment> move;       //args: Structure* dst, Structure* src, bool at_construct
         art::shared_ptr<FuncEnvironment> compare;    //args: Structure* first, Structure* second, return: -1 if first < second, 0 if first == second, 1 if first > second
+        art::shared_ptr<FuncEnvironment> constructor; //args: varies..., but required to return value, can be null, used only for reflection
+
         list_array<MethodInfo> methods;
         list_array<ValueInfo> values;
         list_array<StructureTag>* tags;
@@ -1338,6 +1366,28 @@ namespace art {
         void removeTag(const art::ustring& name);
     };
 
+    struct VirtualTable {
+        union {
+            AttachAVirtualTable* regular;
+            AttachADynamicVirtualTable* dynamic;
+        };
+
+        Structure::VTableMode mode : 2;
+        bool is_reference : 1;
+
+        VirtualTable();
+        VirtualTable(nullptr_t);
+        VirtualTable(AttachAVirtualTable* vt);
+        VirtualTable(AttachADynamicVirtualTable* vt);
+        VirtualTable(VirtualTable&&);
+        VirtualTable(const VirtualTable&);
+        ~VirtualTable();
+
+        VirtualTable& operator=(VirtualTable&&);
+        VirtualTable& operator=(const VirtualTable&);
+
+        void destroy();
+    };
     //static values can be implemented by builder, allocate somewhere in memory and put references to functions, not structure
     class Structure {
     public:
@@ -1404,6 +1454,13 @@ namespace art {
         void* self;
         void (*self_cleanup)(void* self);
         void* vtable;
+    };
+
+    struct line_info {
+        uint64_t begin = -1; //do not modify
+        uint64_t end = -1;   //do not modify
+        uint64_t line = -1;
+        uint64_t column = -1;
     };
 }
 #endif /* SRC_RUN_TIME_ATTACHA_ABI_STRUCTS */

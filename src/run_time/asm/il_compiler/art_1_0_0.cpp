@@ -441,9 +441,7 @@ namespace art {
                     case OpcodeArray::insert_range: {
                         ValueIndexPos arr1 = readIndexPos(data, data_len, i);
                         ValueIndexPos pos = readIndexPos(data, data_len, i);
-                        ValueIndexPos start1 = readIndexPos(data, data_len, i);
-                        ValueIndexPos end1 = readIndexPos(data, data_len, i);
-                        arr_op.insert_range(arr1, pos, start1, end1);
+                        arr_op.insert_range(arr1, pos);
                         break;
                     }
                     case OpcodeArray::get: {
@@ -759,6 +757,98 @@ namespace art {
                     compiler.dynamic().remove_qualifiers(value);
                 }
 
+                void dynamic_global_get() {
+                    ValueIndexPos to = readIndexPos(data, data_len, i);
+                    ValueIndexPos location = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.dynamic().global_get(to, location, separator);
+                }
+
+                void dynamic_global_set() {
+                    ValueIndexPos from = readIndexPos(data, data_len, i);
+                    ValueIndexPos location = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.dynamic().global_set(from, location, separator);
+                }
+
+                void dynamic_map_op() {
+                    ValueIndexPos arr = readIndexPos(data, data_len, i);
+                    auto move_mode = readData<bool>(data, data_len, i);
+                    auto map_op = compiler.dynamic().map_op(arr, move_mode);
+                    switch (readData<OpcodeMap>(data, data_len, i)) {
+                    case OpcodeMap::set: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos value = readIndexPos(data, data_len, i);
+                        map_op.set(index, value);
+                        break;
+                    }
+                    case OpcodeMap::get: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        map_op.get(index, result);
+                        break;
+                    }
+                    case OpcodeMap::contains: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        map_op.contains(index);
+                        break;
+                    }
+                    case OpcodeMap::remove_item: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        map_op.remove_item(index);
+                        break;
+                    }
+                    case OpcodeMap::reserve: {
+                        ValueIndexPos len = readIndexPos(data, data_len, i);
+                        map_op.reserve(len);
+                        break;
+                    }
+                    case OpcodeMap::size: {
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        map_op.size(result);
+                        break;
+                    }
+                    default:
+                        throw InvalidIL("Invalid array operation");
+                    }
+                }
+
+                void dynamic_set_op() {
+                    ValueIndexPos arr = readIndexPos(data, data_len, i);
+                    auto move_mode = readData<bool>(data, data_len, i);
+                    auto set_op = compiler.dynamic().set_op(arr, move_mode);
+                    switch (readData<OpcodeSet>(data, data_len, i)) {
+                    case OpcodeSet::set: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos value = readIndexPos(data, data_len, i);
+                        set_op.set(index, value);
+                        break;
+                    }
+                    case OpcodeSet::contains: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        set_op.contains(index);
+                        break;
+                    }
+                    case OpcodeSet::remove_item: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        set_op.remove_item(index);
+                        break;
+                    }
+                    case OpcodeSet::reserve: {
+                        ValueIndexPos len = readIndexPos(data, data_len, i);
+                        set_op.reserve(len);
+                        break;
+                    }
+                    case OpcodeSet::size: {
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        set_op.size(result);
+                        break;
+                    }
+                    default:
+                        throw InvalidIL("Invalid array operation");
+                    }
+                }
+
 #pragma endregion
 #pragma region static opcodes
 #pragma region set/remove/move/copy
@@ -992,13 +1082,15 @@ namespace art {
                     ValueIndexPos function_symbol = readIndexPos(data, data_len, i);
                     ValueMeta function_symbol_meta = readData<ValueMeta>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     ClassAccess access = readData<ClassAccess>(data, data_len, i);
                     if (flags.use_result) {
                         auto result = readIndexPos(data, data_len, i);
                         auto result_meta = readData<ValueMeta>(data, data_len, i);
-                        compiler.static_().call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access, result, result_meta);
+                        compiler.static_().call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access, result, result_meta);
                     } else
-                        compiler.static_().call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access);
+                        compiler.static_().call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access);
                 }
 
                 void static_call_value_function_id() {
@@ -1006,12 +1098,14 @@ namespace art {
                     flags.encoded = readData<uint8_t>(data, data_len, i);
                     uint64_t function_id = readData<uint64_t>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     if (flags.use_result) {
                         auto result = readIndexPos(data, data_len, i);
                         auto result_meta = readData<ValueMeta>(data, data_len, i);
-                        compiler.static_().call_value_function_id(cast_to_local(flags), function_id, structure, result, result_meta);
+                        compiler.static_().call_value_function_id(cast_to_local(flags), function_id, structure, structure_name, separator, result, result_meta);
                     } else
-                        compiler.static_().call_value_function_id(cast_to_local(flags), function_id, structure);
+                        compiler.static_().call_value_function_id(cast_to_local(flags), function_id, structure, structure_name, separator);
                 }
 
                 void static_call_value_function_and_ret() {
@@ -1020,8 +1114,10 @@ namespace art {
                     ValueIndexPos function_symbol = readIndexPos(data, data_len, i);
                     ValueMeta function_symbol_meta = readData<ValueMeta>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     ClassAccess access = readData<ClassAccess>(data, data_len, i);
-                    compiler.static_().call_value_function_and_ret(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access);
+                    compiler.static_().call_value_function_and_ret(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access);
                 }
 
                 void static_call_value_function_id_and_ret() {
@@ -1029,7 +1125,9 @@ namespace art {
                     flags.encoded = readData<uint8_t>(data, data_len, i);
                     uint64_t function_id = readData<uint64_t>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
-                    compiler.static_().call_value_function_id_and_ret(cast_to_local(flags), function_id, structure);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.static_().call_value_function_id_and_ret(cast_to_local(flags), function_id, structure, structure_name, separator);
                 }
 
                 void static_static_call_value_function() {
@@ -1038,13 +1136,15 @@ namespace art {
                     ValueIndexPos function_symbol = readIndexPos(data, data_len, i);
                     ValueMeta function_symbol_meta = readData<ValueMeta>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     ClassAccess access = readData<ClassAccess>(data, data_len, i);
                     if (flags.use_result) {
                         auto result = readIndexPos(data, data_len, i);
                         auto result_meta = readData<ValueMeta>(data, data_len, i);
-                        compiler.static_().static_call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access, result, result_meta);
+                        compiler.static_().static_call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access, result, result_meta);
                     } else
-                        compiler.static_().static_call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access);
+                        compiler.static_().static_call_value_function(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access);
                 }
 
                 void static_static_call_value_function_id() {
@@ -1052,12 +1152,14 @@ namespace art {
                     flags.encoded = readData<uint8_t>(data, data_len, i);
                     uint64_t function_id = readData<uint64_t>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     if (flags.use_result) {
                         auto result = readIndexPos(data, data_len, i);
                         auto result_meta = readData<ValueMeta>(data, data_len, i);
-                        compiler.static_().static_call_value_function_id(cast_to_local(flags), function_id, structure, result, result_meta);
+                        compiler.static_().static_call_value_function_id(cast_to_local(flags), function_id, structure, structure_name, separator, result, result_meta);
                     } else
-                        compiler.static_().static_call_value_function_id(cast_to_local(flags), function_id, structure);
+                        compiler.static_().static_call_value_function_id(cast_to_local(flags), function_id, structure, structure_name, separator);
                 }
 
                 void static_static_call_value_function_and_ret() {
@@ -1066,8 +1168,10 @@ namespace art {
                     ValueIndexPos function_symbol = readIndexPos(data, data_len, i);
                     ValueMeta function_symbol_meta = readData<ValueMeta>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
                     ClassAccess access = readData<ClassAccess>(data, data_len, i);
-                    compiler.static_().static_call_value_function_and_ret(cast_to_local(flags), function_symbol, function_symbol_meta, structure, access);
+                    compiler.static_().static_call_value_function_and_ret(cast_to_local(flags), function_symbol, function_symbol_meta, structure, structure_name, separator, access);
                 }
 
                 void static_static_call_value_function_id_and_ret() {
@@ -1075,25 +1179,31 @@ namespace art {
                     flags.encoded = readData<uint8_t>(data, data_len, i);
                     uint64_t function_id = readData<uint64_t>(data, data_len, i);
                     ValueIndexPos structure = readIndexPos(data, data_len, i);
-                    compiler.static_().static_call_value_function_id_and_ret(cast_to_local(flags), function_id, structure);
+                    ValueIndexPos structure_name = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.static_().static_call_value_function_id_and_ret(cast_to_local(flags), function_id, structure, structure_name, separator);
                 }
 
                 void static_set_structure_value() {
                     auto value_name = readIndexPos(data, data_len, i);
                     auto access = readData<ClassAccess>(data, data_len, i);
                     auto structure = readIndexPos(data, data_len, i);
+                    auto structure_name = readIndexPos(data, data_len, i);
+                    auto separator = readIndexPos(data, data_len, i);
                     auto set = readIndexPos(data, data_len, i);
                     auto set_meta = readData<ValueMeta>(data, data_len, i);
-                    compiler.static_().set_structure_value(value_name, access, structure, set, set_meta);
+                    compiler.static_().set_structure_value(value_name, access, structure, structure_name, separator, set, set_meta);
                 }
 
                 void static_get_structure_value() {
                     auto value_name = readIndexPos(data, data_len, i);
                     auto access = readData<ClassAccess>(data, data_len, i);
                     auto structure = readIndexPos(data, data_len, i);
+                    auto structure_name = readIndexPos(data, data_len, i);
+                    auto separator = readIndexPos(data, data_len, i);
                     auto result = readIndexPos(data, data_len, i);
                     auto result_meta = readData<ValueMeta>(data, data_len, i);
-                    compiler.static_().get_structure_value(value_name, access, structure, result, result_meta);
+                    compiler.static_().get_structure_value(value_name, access, structure, structure_name, separator, result, result_meta);
                 }
 
                 void static_explicit_await() {
@@ -1142,9 +1252,7 @@ namespace art {
                         ValueIndexPos arr1 = readIndexPos(data, data_len, i);
                         ValueMeta arr1_meta = readData<ValueMeta>(data, data_len, i);
                         ValueIndexPos pos = readIndexPos(data, data_len, i);
-                        ValueIndexPos start1 = readIndexPos(data, data_len, i);
-                        ValueIndexPos end1 = readIndexPos(data, data_len, i);
-                        arr_op.insert_range(arr1, arr1_meta, pos, start1, end1);
+                        arr_op.insert_range(arr1, arr1_meta, pos);
                         break;
                     }
                     case OpcodeArray::get: {
@@ -1341,6 +1449,103 @@ namespace art {
                     compiler.static_().move_unreference(result_index, result_meta, source_index, source_meta);
                 }
 
+                void static_remove_qualifiers() {
+                    ValueIndexPos index = readIndexPos(data, data_len, i);
+                    compiler.static_().remove_qualifiers(index);
+                }
+
+                void static_global_get() {
+                    ValueIndexPos to = readIndexPos(data, data_len, i);
+                    ValueIndexPos location = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.static_().global_set(to, location, separator);
+                }
+
+                void static_global_set() {
+                    ValueIndexPos from = readIndexPos(data, data_len, i);
+                    ValueIndexPos location = readIndexPos(data, data_len, i);
+                    ValueIndexPos separator = readIndexPos(data, data_len, i);
+                    compiler.static_().global_set(from, location, separator);
+                }
+
+                void static_map_op() {
+                    ValueIndexPos arr = readIndexPos(data, data_len, i);
+                    auto move_mode = readData<bool>(data, data_len, i);
+                    auto map_op = compiler.static_().map_op(arr, move_mode);
+                    switch (readData<OpcodeMap>(data, data_len, i)) {
+                    case OpcodeMap::set: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos value = readIndexPos(data, data_len, i);
+                        map_op.set(index, value);
+                        break;
+                    }
+                    case OpcodeMap::get: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        map_op.get(index, result);
+                        break;
+                    }
+                    case OpcodeMap::contains: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        map_op.contains(index);
+                        break;
+                    }
+                    case OpcodeMap::remove_item: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        map_op.remove_item(index);
+                        break;
+                    }
+                    case OpcodeMap::reserve: {
+                        ValueIndexPos len = readIndexPos(data, data_len, i);
+                        map_op.reserve(len);
+                        break;
+                    }
+                    case OpcodeMap::size: {
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        map_op.size(result);
+                        break;
+                    }
+                    default:
+                        throw InvalidIL("Invalid array operation");
+                    }
+                }
+
+                void static_set_op() {
+                    ValueIndexPos arr = readIndexPos(data, data_len, i);
+                    auto move_mode = readData<bool>(data, data_len, i);
+                    auto set_op = compiler.static_().set_op(arr, move_mode);
+                    switch (readData<OpcodeSet>(data, data_len, i)) {
+                    case OpcodeSet::set: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        ValueIndexPos value = readIndexPos(data, data_len, i);
+                        set_op.set(index, value);
+                        break;
+                    }
+                    case OpcodeSet::contains: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        set_op.contains(index);
+                        break;
+                    }
+                    case OpcodeSet::remove_item: {
+                        ValueIndexPos index = readIndexPos(data, data_len, i);
+                        set_op.remove_item(index);
+                        break;
+                    }
+                    case OpcodeSet::reserve: {
+                        ValueIndexPos len = readIndexPos(data, data_len, i);
+                        set_op.reserve(len);
+                        break;
+                    }
+                    case OpcodeSet::size: {
+                        ValueIndexPos result = readIndexPos(data, data_len, i);
+                        set_op.size(result);
+                        break;
+                    }
+                    default:
+                        throw InvalidIL("Invalid array operation");
+                    }
+                }
+
 #pragma endregion
 #pragma endregion
 
@@ -1488,6 +1693,21 @@ namespace art {
                     case Opcode::move_un_reference:
                         static_move_un_reference();
                         break;
+                    case Opcode::remove_qualifiers:
+                        static_remove_qualifiers();
+                        break;
+                    case Opcode::global_get:
+                        static_global_get();
+                        break;
+                    case Opcode::global_set:
+                        static_global_set();
+                        break;
+                    case Opcode::map_op:
+                        static_map_op();
+                        break;
+                    case Opcode::set_op:
+                        static_set_op();
+                        break;
 
                     case Opcode::call_self_and_ret:
                     case Opcode::ret:
@@ -1502,7 +1722,6 @@ namespace art {
                     case Opcode::get_reference:
                     case Opcode::make_as_const:
                     case Opcode::remove_const_protect:
-                    case Opcode::remove_qualifiers:
                     case Opcode::log_not:
                     case Opcode::noting:
                     case Opcode::create_saarr:
@@ -1737,6 +1956,18 @@ namespace art {
                     case Opcode::remove_qualifiers:
                         dynamic_remove_qualifiers();
                         break;
+                    case Opcode::global_get:
+                        dynamic_global_get();
+                        break;
+                    case Opcode::global_set:
+                        dynamic_global_set();
+                        break;
+                    case Opcode::map_op:
+                        dynamic_map_op();
+                        break;
+                    case Opcode::set_op:
+                        dynamic_set_op();
+                        break;
                     default:
                         undefined();
                         break;
@@ -1807,12 +2038,15 @@ namespace art {
                 size_t data_len,
                 CASM& casm_assembler,
                 list_array<std::pair<uint64_t, Label>>& jump_list,
+                list_array<art::line_info>& line_info,
+                std::string& file_local_path,
                 std::vector<art::shared_ptr<FuncEnvironment>>& locals,
                 FunctionMetaFlags& flags,
                 uint16_t& used_static_values,
                 uint16_t& used_enviro_vals,
                 uint32_t& used_arguments,
-                uint64_t& constants_values) {
+                uint64_t& constants_values
+            ) {
 
                 flags = readData<FunctionMetaFlags>(data, data_len, to_be_skiped);
                 if (flags.length != data_len)
@@ -1824,6 +2058,18 @@ namespace art {
                     used_enviro_vals = readData<uint16_t>(data, data_len, to_be_skiped);
                 if (flags.used_arguments)
                     used_arguments = readData<uint32_t>(data, data_len, to_be_skiped);
+                if (flags.has_debug_info) {
+                    file_local_path = readString(data, data_len, to_be_skiped);
+                    uint64_t size = readPackedLen(data, data_len, to_be_skiped);
+                    for (uint64_t i = 0; i < size; i++) {
+                        art::line_info info;
+                        info.begin = readPackedLen(data, data_len, to_be_skiped);
+                        info.end = readPackedLen(data, data_len, to_be_skiped);
+                        info.line = readPackedLen(data, data_len, to_be_skiped);
+                        info.column = readPackedLen(data, data_len, to_be_skiped);
+                        line_info.push_back(std::move(info));
+                    }
+                }
                 constants_values = readPackedLen(data, data_len, to_be_skiped);
                 locals.clear();
                 if (flags.has_local_functions) {

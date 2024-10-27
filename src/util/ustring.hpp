@@ -103,6 +103,30 @@ namespace art {
         static constexpr size_t npos = -1;
         void set_unsafe_state(bool state, bool throw_on_error);
         ustring();
+
+        template <size_t len>
+        ustring(const char (&str)[len])
+            : ustring() {
+            flags.type = Type::constant;
+            _data.constant_data = make_constant_pool(str, len);
+        }
+
+        template <size_t len>
+        ustring(const char* str)
+            : ustring(str, len) {}
+
+        template <size_t len>
+        ustring(const char8_t* str)
+            : ustring(str, len) {}
+
+        template <size_t len>
+        ustring(const char16_t* str)
+            : ustring(str, len) {}
+
+        template <size_t len>
+        ustring(const char32_t* str)
+            : ustring(str, len) {}
+
         ustring(const char* str); //ansi7 | utf8
         ustring(const char* str, size_t size);
         ustring(const char8_t* str); //utf8
@@ -213,8 +237,8 @@ namespace art {
 
 
         void reserve(size_t);
-        void reserve_push_back(size_t);
-        void reserve_push_front(size_t);
+        void reserve_back(size_t);
+        void reserve_front(size_t);
         void push_back(const ustring& c);
         void push_front(const ustring& c);
 
@@ -259,8 +283,13 @@ namespace art {
         void clear();
         void shrink_to_fit();
 
+
+        size_t find(const ustring& c) const;
         size_t find_last_of(const ustring& c) const;
         size_t find_first_of(const ustring& c) const;
+
+        list_array<ustring> split(const ustring& c) const;
+
 
         /*[[INTERNAL]]*/ char& operator[](size_t i) {
             return data()[i];

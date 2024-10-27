@@ -7,12 +7,13 @@
 #include <util/platform.hpp>
 #if PLATFORM_WINDOWS
 #pragma comment(lib, "Dbghelp.lib")
-#include <Windows.h>
+    #define NOMINMAX
+    #include <Windows.h>
 
-#include <Dbghelp.h>
-#include <Psapi.h>
+    #include <Dbghelp.h>
+    #include <Psapi.h>
 
-#include <utf8cpp/utf8.h>
+    #include <utf8cpp/utf8.h>
 
     #include <attacha/configuration/run_time.hpp>
     #include <attacha/configuration/tasks.hpp>
@@ -24,7 +25,7 @@
     #include <run_time/tasks/util/light_stack.hpp>
     #include <util/hash.hpp>
     #include <util/string_help.hpp>
-
+    #include <util/ustring.hpp>
 namespace art {
     size_t page_size = []() {
         SYSTEM_INFO si;

@@ -13,7 +13,9 @@ namespace art {
     namespace il_header {
         struct decoded {
             il_compiler::basic* compiler = nullptr;
+            std::string file_local_path;
             list_array<std::pair<uint64_t, Label>> jump_list;
+            list_array<art::line_info> line_info;
             std::vector<art::shared_ptr<FuncEnvironment>> locals;
             FunctionMetaFlags flags = {0};
             uint16_t used_static_values = 0;

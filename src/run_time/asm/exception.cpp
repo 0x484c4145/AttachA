@@ -397,7 +397,7 @@ namespace art {
             switch (*data_info++) {
             case 0: {
                 uint64_t handle_count = internal::readFromArrayAsValue<uint64_t>(data_info);
-                exceptions.reserve_push_back(handle_count);
+                exceptions.reserve_back(handle_count);
                 for (size_t i = 0; i < handle_count; i++) {
                     size_t len = 0;
                     char* str = internal::readFromArrayAsArray<char>(data_info, len);
@@ -415,7 +415,7 @@ namespace art {
             }
             case 2: {
                 uint64_t handle_count = internal::readFromArrayAsValue<uint64_t>(data_info);
-                exceptions.reserve_push_back(handle_count);
+                exceptions.reserve_back(handle_count);
                 for (size_t i = 0; i < handle_count; i++) {
                     uint16_t value = internal::readFromArrayAsValue<uint16_t>(data_info);
                     ValueItem* item = (ValueItem*)enviro + (uint32_t(value) << 1);
@@ -425,7 +425,7 @@ namespace art {
             }
             case 3: {
                 uint64_t handle_count = internal::readFromArrayAsValue<uint64_t>(data_info);
-                exceptions.reserve_push_back(handle_count);
+                exceptions.reserve_back(handle_count);
                 for (size_t i = 0; i < handle_count; i++) {
                     bool is_dynamic = internal::readFromArrayAsValue<bool>(data_info);
                     if (!is_dynamic) {

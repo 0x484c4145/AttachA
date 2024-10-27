@@ -4,12 +4,12 @@
 // (See accompanying file LICENSE or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <run_time/ValueEnvironment.hpp>
 #include <run_time/asm/FuncEnvironment.hpp>
 #include <run_time/asm/attacha_environment.hpp>
 #include <run_time/tasks.hpp>
 #include <run_time/tasks/_internal.hpp>
 #include <run_time/tasks/util/native_workers_singleton.hpp>
+#include <run_time/values_global.hpp>
 #include <util/platform.hpp>
 
 namespace art {
@@ -76,7 +76,7 @@ namespace art {
      : ex_handle(exception_handler), func(call_func), timeout(task_timeout) {
         put_arguments(args, arguments);
         if (used_task_local)
-            _task_local = new ValueEnvironment();
+            _task_local = new values_global();
 
         if (Task::max_planned_tasks) {
             MutexUnify uni(glob.task_thread_safety);
@@ -91,7 +91,7 @@ namespace art {
     Task::Task(art::shared_ptr<FuncEnvironment> call_func, ValueItem&& arguments, bool used_task_local, art::shared_ptr<FuncEnvironment> exception_handler, std::chrono::high_resolution_clock::time_point task_timeout, TaskPriority priority) : ex_handle(exception_handler), func(call_func), timeout(task_timeout) {
         put_arguments(args, std::move(arguments));
         if (used_task_local)
-            _task_local = new ValueEnvironment();
+            _task_local = new values_global();
 
         if (Task::max_planned_tasks) {
             MutexUnify uni(glob.task_thread_safety);
@@ -117,9 +117,9 @@ namespace art {
     }
 
     Task::~Task() {
-        if (_task_local && _task_local != (ValueEnvironment*)-1)
+        if (_task_local && _task_local != (values_global*)-1)
             delete _task_local;
-        if (_task_local == (ValueEnvironment*)-1)
+        if (_task_local == (values_global*)-1)
             delete (task_callback*)args.getSourcePtr();
 
         if (!started) {
@@ -185,7 +185,7 @@ namespace art {
     }
 
     bool Task::yield_iterate(art::typed_lgr<Task>& lgr_task) {
-        bool res = (!lgr_task->started || lgr_task->is_yield_mode) && lgr_task->_task_local != (ValueEnvironment*)-1;
+        bool res = (!lgr_task->started || lgr_task->is_yield_mode) && lgr_task->_task_local != (values_global*)-1;
         if (res)
             Task::start(lgr_task);
         return res;
@@ -194,11 +194,11 @@ namespace art {
     ValueItem* Task::get_result(art::typed_lgr<Task>& lgr_task, size_t yield_res) {
         if (!total_executors())
             create_executor(1);
-        if (!lgr_task->started && lgr_task->_task_local != (ValueEnvironment*)-1)
+        if (!lgr_task->started && lgr_task->_task_local != (values_global*)-1)
             Task::start(lgr_task);
         MutexUnify uni(lgr_task->no_race);
         art::unique_lock l(uni);
-        if (lgr_task->_task_local == (ValueEnvironment*)-1) {
+        if (lgr_task->_task_local == (values_global*)-1) {
             l.unlock();
             if (!task_callback::await(*lgr_task)) {
                 l.lock();
@@ -223,11 +223,11 @@ namespace art {
         if (!total_executors())
             create_executor(1);
 
-        if (!lgr_task->started && make_start && lgr_task->_task_local != (ValueEnvironment*)-1)
+        if (!lgr_task->started && make_start && lgr_task->_task_local != (values_global*)-1)
             Task::start(lgr_task);
         MutexUnify uni(lgr_task->no_race);
         art::unique_lock l(uni);
-        if (lgr_task->_task_local != (ValueEnvironment*)-1)
+        if (lgr_task->_task_local != (values_global*)-1)
             lgr_task->fres.awaitEnd(l);
         else {
             l.unlock();
@@ -423,7 +423,7 @@ namespace art {
     void Task::await_multiple(list_array<art::typed_lgr<Task>>& tasks, bool pre_started, bool release) {
         if (!pre_started) {
             for (auto& it : tasks) {
-                if (it->_task_local != (ValueEnvironment*)-1)
+                if (it->_task_local != (values_global*)-1)
                     Task::start(it);
             }
         }
@@ -442,7 +442,7 @@ namespace art {
             art::typed_lgr<Task>* iter = tasks;
             size_t count = len;
             while (count--) {
-                if ((*iter)->_task_local != (ValueEnvironment*)-1)
+                if ((*iter)->_task_local != (values_global*)-1)
                     Task::start(*iter++);
             }
         }
@@ -484,7 +484,7 @@ namespace art {
     }
 
     void Task::notify_cancel(art::typed_lgr<Task>& lgr_task) {
-        if (lgr_task->_task_local == (ValueEnvironment*)-1)
+        if (lgr_task->_task_local == (values_global*)-1)
             task_callback::cancel(*lgr_task);
         else
             lgr_task->make_cancel = true;
@@ -495,13 +495,13 @@ namespace art {
             notify_cancel(it);
     }
 
-    class ValueEnvironment* Task::task_local() {
+    class values_global* Task::task_local() {
         if (!loc.is_task_thread)
             return nullptr;
         else if (loc.curr_task->_task_local)
             return loc.curr_task->_task_local;
         else
-            return loc.curr_task->_task_local = new ValueEnvironment();
+            return loc.curr_task->_task_local = new values_global();
     }
 
     size_t Task::task_id() {
@@ -744,7 +744,7 @@ namespace art {
             timeout
         );
         tsk->args = new task_callback(dummy_data, on_await, on_cancel, on_timeout, on_start, on_destruct);
-        tsk->_task_local = (ValueEnvironment*)-1;
+        tsk->_task_local = (values_global*)-1;
         if (timeout != std::chrono::high_resolution_clock::time_point::min()) {
             if (!glob.time_control_enabled)
                 startTimeController();
@@ -763,7 +763,7 @@ namespace art {
             timeout
         );
         tsk->args = new task_callback(dummy_data, on_await, on_cancel, on_timeout, nullptr, on_destruct),
-        tsk->_task_local = (ValueEnvironment*)-1;
+        tsk->_task_local = (values_global*)-1;
 
         if (timeout != std::chrono::high_resolution_clock::time_point::min()) {
             if (!glob.time_control_enabled)

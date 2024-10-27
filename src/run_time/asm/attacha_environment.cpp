@@ -4,15 +4,19 @@ namespace art {
     attacha_environment attacha_environment::self;
 
     attacha_environment::attacha_environment() {
-        value_globals = nullptr;
+        _value_global = nullptr;
+        _types_global = nullptr;
         function_globals = nullptr;
         code_gen = nullptr;
     }
 
     attacha_environment::~attacha_environment() {
         art::lock_guard<art::TaskRecursiveMutex> lock(self.mutex);
-        if (value_globals)
-            delete value_globals;
+        if (_value_global)
+            delete _value_global;
+
+        if (_types_global)
+            delete _types_global;
 
         if (function_globals)
             remove_function_globals(function_globals);
@@ -28,11 +32,18 @@ namespace art {
         return *self.function_globals;
     }
 
-    ValueEnvironment& attacha_environment::get_value_globals() {
+    values_global& attacha_environment::get_value_globals() {
         art::lock_guard<art::TaskRecursiveMutex> lock(self.mutex);
-        if (!self.value_globals)
-            self.value_globals = new ValueEnvironment();
-        return *self.value_globals;
+        if (!self._value_global)
+            self._value_global = new values_global();
+        return *self._value_global;
+    }
+
+    types_global& attacha_environment::get_types_global() {
+        art::lock_guard<art::TaskRecursiveMutex> lock(self.mutex);
+        if (!self._types_global)
+            self._types_global = new types_global();
+        return *self._types_global;
     }
 
     attacha_environment::code_gen_handle& attacha_environment::get_code_gen() {

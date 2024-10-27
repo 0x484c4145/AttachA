@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include <run_time/AttachA_CXX.hpp>
+#include <run_time/asm/attacha_environment.hpp>
 #include <run_time/attacha_abi_structs.hpp>
 #include <run_time/library/bytes.hpp>
 #include <run_time/library/chanel.hpp>
@@ -425,7 +426,7 @@ namespace art {
                     ValueItem* max_it = nullptr;
                     size_t cur_count = 0;
                     ValueItem* cur_it = nullptr;
-                    for (auto& it : ((list_array<ValueItem>*)args->getSourcePtr())->sort_copy()) {
+                    for (auto& it : ((list_array<ValueItem>*)args->getSourcePtr())->copy().sort()) {
                         if (!cur_it) {
                             cur_it = &it;
                             ++cur_count;
@@ -539,7 +540,7 @@ namespace art {
                 case VType::uarr: {
                     auto& args_r = *(list_array<ValueItem>*)args->getSourcePtr();
                     list_array<ValueItem>* res = new list_array<ValueItem>;
-                    res->reserve_push_back(args_r.size());
+                    res->reserve_back(args_r.size());
                     for (auto& it : args_r)
                         res->push_back(math_transform_impl<ffn, dfn>(it));
                     return new ValueItem(res, VType::uarr, no_copy);
@@ -686,7 +687,7 @@ namespace art {
                 switch (args->meta.vtype) {
                 case VType::uarr: {
                     list_array<ValueItem> new_uarr;
-                    new_uarr.reserve_push_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
+                    new_uarr.reserve_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
                     for (auto& it : *(list_array<ValueItem>*)args->getSourcePtr())
                         new_uarr.push_back(math_factorial_impl(it));
                     return new ValueItem(std::move(new_uarr));
@@ -773,7 +774,7 @@ namespace art {
                 switch (args->meta.vtype) {
                 case VType::uarr: {
                     list_array<ValueItem> new_uarr;
-                    new_uarr.reserve_push_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
+                    new_uarr.reserve_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
                     for (auto& it : *(list_array<ValueItem>*)args->getSourcePtr())
                         new_uarr.push_back(math_trigonometric_impl<fn>(it));
                     return new ValueItem(std::move(new_uarr));
@@ -879,7 +880,7 @@ namespace art {
                 switch (args->meta.vtype) {
                 case VType::uarr: {
                     list_array<ValueItem> new_uarr;
-                    new_uarr.reserve_push_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
+                    new_uarr.reserve_back((((list_array<ValueItem>*)args->getSourcePtr())->size()));
                     for (auto& it : *(list_array<ValueItem>*)args->getSourcePtr())
                         new_uarr.push_back(ValueItem(pow((double)it, power)));
                     return new ValueItem(std::move(new_uarr));
@@ -1056,6 +1057,7 @@ namespace art {
         FuncEnvironment::AddNative(parallel::constructor::createProxy_TaskLimiter, "# parallel task_limiter", false);
         FuncEnvironment::AddNative(parallel::constructor::createProxy_TaskQuery, "# parallel task_query", false);
         FuncEnvironment::AddNative(parallel::constructor::construct_Task, "# parallel task", false);
+        FuncEnvironment::AddNative(parallel::constructor::construct_Generator, "# parallel generator", false);
         FuncEnvironment::AddNative(parallel::constructor::createProxy_TaskGroup, "# parallel task_group", false);
 
         FuncEnvironment::AddNative(parallel::task_runtime::await_end_tasks, "parallel task_runtime await_end_tasks", false);
@@ -1115,12 +1117,14 @@ namespace art {
         FuncEnvironment::AddNative(chanel::constructor::createProxy_ChanelHandler, "# chanel chanel_handler", false);
     }
 
-    void initStandardLib_internal() {
+    void initStandardLib_internal(bool vtable_full_mode, bool allow_self_build) {
         INIT_CHECK
-        internal::init();
-        FuncEnvironment::AddNative(internal::constructor::createProxy_function_builder, "# internal function_builder", false);
-        FuncEnvironment::AddNative(internal::constructor::createProxy_index_pos, "# internal index_pos", false);
-        FuncEnvironment::AddNative(internal::constructor::createProxy_line_info, "# internal line_info", false);
+        internal::init(vtable_full_mode, allow_self_build);
+        if (allow_self_build) {
+            FuncEnvironment::AddNative(internal::constructor::createProxy_function_builder, "# internal function_builder", false);
+            FuncEnvironment::AddNative(internal::constructor::createProxy_index_pos, "# internal index_pos", false);
+            FuncEnvironment::AddNative(internal::constructor::createProxy_line_info, "# internal line_info", false);
+        }
         FuncEnvironment::AddNative((Environment)internal::view_structure, "internal view_structure", false);
     }
 
@@ -1192,6 +1196,8 @@ namespace art {
         FuncEnvironment::AddNative(localization::set_localized_string, "localization set_localized_string", false);
         FuncEnvironment::AddNative(localization::update_localization_strings, "localization update_localization_strings", false);
         FuncEnvironment::AddNative(localization::use_local_language, "localization use_local_language", false);
+        attacha_environment::get_value_globals().join_namespace({"localization", "current_locale_changed"})->value = CXX::cxxCall(localization::get_current_locale_changed);
+        attacha_environment::get_value_globals().join_namespace({"localization", "current_locale_updated"})->value = CXX::cxxCall(localization::get_current_locale_updated);
     }
 
     void initStandardLib_strings() {
@@ -1347,12 +1353,13 @@ namespace art {
 
     ValueItem* start_debug(ValueItem*, uint32_t) {
         initStandardLib_debug();
+        FuncEnvironment::Unload("debug start");
         return nullptr;
     }
 
     void initStandardLib_start_debug() {
         INIT_CHECK
-        FuncEnvironment::AddNative(start_debug, "debug start", false);
+        FuncEnvironment::AddNative(start_debug, "debug start", true);
     }
 
     void initStandardLib() {
@@ -1363,7 +1370,7 @@ namespace art {
         initStandardLib_file();
         initStandardLib_parallel();
         initStandardLib_chanel();
-        initStandardLib_internal();
+        initStandardLib_internal(true, true);
         initStandardLib_internal_memory();
         initStandardLib_internal_run_time();
         initStandardLib_internal_run_time_native();
@@ -1384,7 +1391,7 @@ namespace art {
         initStandardLib_parallel();
         initStandardLib_chanel();
         initStandardLib_net();
-        initStandardLib_internal();
+        initStandardLib_internal(false, false); //allow reflection but disable modify access, also disable self build
         initStandardLib_localization();
         initStandardLib_times();
     }

@@ -28,12 +28,15 @@ namespace art {
                 size_t end_offset,
                 CASM& casm_assembler,
                 list_array<std::pair<uint64_t, Label>>& jump_list,
+                list_array<art::line_info>& line_info,
+                std::string& file_local_path,
                 std::vector<art::shared_ptr<FuncEnvironment>>& locals,
                 FunctionMetaFlags& flags,
                 uint16_t& used_static_values,
                 uint16_t& used_enviro_vals,
                 uint32_t& used_arguments,
-                uint64_t& constants_values) = 0;
+                uint64_t& constants_values
+            ) = 0;
         };
 
         basic* map_compiler(const art::ustring& name_version);

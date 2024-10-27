@@ -47,7 +47,7 @@ extern "C" uint64_t CallTypeCall(art::DynamicCall::PROC proc, list_array<art::Dy
     }
     if (arguments.size()) {
         if (!(arguments.size() & 1))
-            arguments.push_back(0);
+            arguments.push_back(art::DynamicCall::ArgumentsHolder::ArgumentItem{0});
         arguments.commit();
         return ArgumentsPrepareCallForFastcall(
             register_rcx,

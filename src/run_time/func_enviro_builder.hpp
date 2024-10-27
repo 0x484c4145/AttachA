@@ -11,21 +11,18 @@
 #include <run_time/asm/FuncEnvironment.hpp>
 
 namespace art {
-    struct FuncEnviroBuilder_line_info {
-        uint64_t begin;
-        uint64_t line;
-        uint64_t column;
-    };
-
     class FuncEnviroBuilder {
         std::vector<uint8_t> code;
         std::vector<uint64_t> jump_pos;
         std::unordered_map<art::ustring, size_t, art::hash<art::ustring>> jump_pos_map;
         list_array<ValueItem> dynamic_values;
         list_array<ValueItem> all_constants;
+        list_array<art::line_info> line_info;
         std::vector<art::shared_ptr<FuncEnvironment>> local_funs;
         std::unordered_set<uint64_t> except_ids_watch;
         std::unordered_set<uint64_t> life_ids_watch;
+        std::string file_local_path;
+
         uint64_t cop = 0;
         uint16_t values = 0;
         uint16_t static_values = 0;
@@ -68,7 +65,23 @@ namespace art {
             return it->second;
         }
 
+        size_t internal_jump() {
+            auto jump_name = " __internal_jump#" + std::to_string(jump_pos.size());
+            jump_pos_map[jump_name] = jump_pos.size();
+            jump_pos.push_back(code.size());
+            return jump_pos.size() - 1;
+        }
+
+        bool is_internal_jump(size_t id) {
+            return jump_pos_map.contains("__internal_jump#" + std::to_string(id));
+        }
+
     public:
+        void set_file_local_path(std::string_view file_local_path) {
+            flags.has_debug_info = true;
+            this->file_local_path = file_local_path;
+        }
+
         bool get_unify_constants() const {
             return unify_constants;
         }
@@ -180,7 +193,7 @@ namespace art {
             void insert(ValueIndexPos index, ValueIndexPos val, bool move = true);
             void push_end(ValueIndexPos val, bool move = true);
             void push_start(ValueIndexPos val, bool move = true);
-            void insert_range(ValueIndexPos arr2, ValueIndexPos arr2_start, ValueIndexPos arr2_end, ValueIndexPos arr_pos, bool move = true);
+            void insert_range(ValueIndexPos arr2, ValueIndexPos arr_pos, bool move = true);
             void get(ValueIndexPos to, ValueIndexPos index, bool move = true, ArrCheckMode check_bounds = ArrCheckMode::no_check);
             void take(ValueIndexPos to, ValueIndexPos index, bool move = true);
             void take_end(ValueIndexPos to, bool move = true);
@@ -217,7 +230,7 @@ namespace art {
             void insert(ValueIndexPos index, ValueIndexPos val, bool move = true);
             void push_end(ValueIndexPos val, bool move = true);
             void push_start(ValueIndexPos val, bool move = true);
-            void insert_range(ValueIndexPos arr2, ValueIndexPos arr2_start, ValueIndexPos arr2_end, ValueIndexPos arr_pos, bool move = true);
+            void insert_range(ValueIndexPos arr2, ValueIndexPos arr_pos, bool move = true);
             void get(ValueIndexPos to, ValueIndexPos index, bool move = true, ArrCheckMode check_bounds = ArrCheckMode::no_check);
             void take(ValueIndexPos to, ValueIndexPos index, bool move = true);
             void take_end(ValueIndexPos to, bool move = true);
@@ -266,6 +279,30 @@ namespace art {
         void get_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos val_name, ValueIndexPos res);
         void set_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos val_name, ValueIndexPos set_val);
 
+
+        void call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async = false);
+        void call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, ValueIndexPos res_val, ValueMeta res_meta, bool is_async = false);
+        void call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async = false);
+        void call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, ValueIndexPos res_val, ValueMeta res_meta, bool is_async = false);
+
+
+        void call_value_interface_and_ret(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async = false);
+        void call_value_interface_id_and_ret(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async = false);
+
+
+        void static_call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async = false);
+        void static_call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, ValueIndexPos res_val, ValueMeta res_meta, bool is_async = false);
+        void static_call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async = false);
+        void static_call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, ValueIndexPos res_val, ValueMeta res_meta, bool is_async = false);
+
+
+        void static_call_value_interface_and_ret(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async = false);
+        void static_call_value_interface_id_and_ret(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async = false);
+
+        void get_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos val_name, ValueIndexPos res, ValueMeta res_meta);
+        void set_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos val_name, ValueIndexPos set_val, ValueMeta set_val_meta);
+
+
         void explicit_await(ValueIndexPos await_value);
 
 
@@ -291,6 +328,75 @@ namespace art {
         void copy_un_reference(ValueIndexPos res, ValueIndexPos val);
         void move_un_reference(ValueIndexPos res, ValueIndexPos val);
         void remove_qualifiers(ValueIndexPos res); //same as ungc and remove_const_protect
+        void global_get(ValueIndexPos res, ValueIndexPos location, ValueIndexPos separator);
+        void global_set(ValueIndexPos res, ValueIndexPos location, ValueIndexPos separator);
+
+        struct _map {
+            FuncEnviroBuilder& build;
+            ValueIndexPos map;
+
+            _map(FuncEnviroBuilder& build, ValueIndexPos map)
+                : build(build), map(map) {}
+
+            void set(ValueIndexPos key, ValueIndexPos val, bool move = false);
+            void get(ValueIndexPos to, ValueIndexPos key, bool move = false);
+            void remove(ValueIndexPos key);
+            void has_key(ValueIndexPos key);
+            void reserve(ValueIndexPos count);
+            void size(ValueIndexPos to);
+        };
+
+        _map map(ValueIndexPos map);
+
+        struct _static_map {
+            FuncEnviroBuilder& build;
+            ValueIndexPos map;
+
+            _static_map(FuncEnviroBuilder& build, ValueIndexPos map)
+                : build(build), map(map) {}
+
+            void set(ValueIndexPos key, ValueIndexPos val, bool move = false);
+            void get(ValueIndexPos to, ValueIndexPos key, bool move = false);
+            void remove(ValueIndexPos key);
+            void has_key(ValueIndexPos key);
+            void reserve(ValueIndexPos count);
+            void size(ValueIndexPos to);
+        };
+
+        _static_map static_map(ValueIndexPos map);
+
+        struct _set {
+            FuncEnviroBuilder& build;
+            ValueIndexPos set_;
+
+            _set(FuncEnviroBuilder& build, ValueIndexPos set)
+                : build(build), set_(set) {}
+
+            void set(ValueIndexPos key, ValueIndexPos val, bool move = false);
+            void remove(ValueIndexPos key);
+            void has_key(ValueIndexPos key);
+            void reserve(ValueIndexPos count);
+            void size(ValueIndexPos to);
+        };
+
+        _set set(ValueIndexPos set);
+
+        struct _static_set {
+            FuncEnviroBuilder& build;
+            ValueIndexPos _set;
+
+            _static_set(FuncEnviroBuilder& build, ValueIndexPos set)
+                : build(build), _set(set) {}
+
+            void set(ValueIndexPos key, ValueIndexPos val, bool move = false);
+            void remove(ValueIndexPos key);
+            void has_key(ValueIndexPos key);
+            void reserve(ValueIndexPos count);
+            void size(ValueIndexPos to);
+        };
+
+        _static_set static_set(ValueIndexPos set);
+
 
         struct _except_build {
             FuncEnviroBuilder& build;
@@ -323,8 +429,8 @@ namespace art {
         FuncEnviroBuilder& O_flag_used_vec128(uint8_t index);
         FuncEnviroBuilder& O_flag_is_patchable(bool is_patchable);
 
-        FuncEnviroBuilder_line_info O_line_info_begin();
-        void O_line_info_end(FuncEnviroBuilder_line_info line_info);
+        art::line_info O_line_info_begin();
+        void O_line_info_end(art::line_info line_info);
 
         art::shared_ptr<FuncEnvironment> O_prepare_func();
         std::vector<uint8_t> O_build_func();

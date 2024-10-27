@@ -38,12 +38,15 @@ namespace art {
             data_len,
             a,
             jump_list,
+            line_info,
+            file_local_path,
             locals,
             flags,
             used_static_values,
             used_enviro_vals,
             used_arguments,
-            constants_values);
+            constants_values
+        );
         return to_be_skiped;
     }
 

@@ -213,7 +213,6 @@ namespace art {
     void* copyValue(void*& val, ValueMeta& meta);
 
 
-    void** preSetValue(void** value, ValueMeta set_meta, bool match_gc_dif);
     void*& getValue(void*& value, ValueMeta& meta);
     const void* const& getValue(const void* const& value, const ValueMeta& meta);
     void*& getValue(void** value);
@@ -389,6 +388,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(int8_t)(ptrdiff_t)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
@@ -401,6 +402,8 @@ namespace art {
                     if constexpr (std::is_same_v<T, void*>)
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
                         return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(int16_t)(ptrdiff_t)val;
@@ -415,6 +418,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(int32_t)(ptrdiff_t)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
@@ -427,6 +432,8 @@ namespace art {
                     if constexpr (std::is_same_v<T, void*>)
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
                         return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(int64_t)(ptrdiff_t)val;
@@ -441,6 +448,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(uint8_t&)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
@@ -453,6 +462,8 @@ namespace art {
                     if constexpr (std::is_same_v<T, void*>)
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
                         return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(uint16_t&)val;
@@ -467,6 +478,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(uint32_t&)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
@@ -479,6 +492,8 @@ namespace art {
                     if constexpr (std::is_same_v<T, void*>)
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
                         return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(uint64_t&)val;
@@ -493,6 +508,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(float&)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
@@ -506,8 +523,25 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
                         return (T)(double&)val;
+                    else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
+                        return AsPointer<std::remove_pointer_t<T>, double>(val);
+                    else
+                        return (T)val;
+                    break;
+                }
+                case VType::character: {
+                    if constexpr (std::is_same_v<T, void*>)
+                        return const_cast<void*>(val);
+                    else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
+                    else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
+                        return (T)(char32_t&)val;
                     else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>)
                         return AsPointer<std::remove_pointer_t<T>, double>(val);
                     else
@@ -536,6 +570,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const int8_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const int8_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_i8");
                     break;
@@ -562,6 +609,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const int16_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const int16_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_i16");
                     break;
@@ -588,6 +648,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const int32_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const int32_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_i32");
                     break;
@@ -614,6 +687,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const int64_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const int64_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_i64");
                     break;
@@ -640,6 +726,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const uint8_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const uint8_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_ui8");
                     break;
@@ -666,6 +765,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const uint16_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const uint16_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_ui16");
                     break;
@@ -692,6 +804,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const uint32_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const uint32_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_ui32");
                     break;
@@ -718,6 +843,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const uint64_t*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const uint64_t*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_ui64");
                     break;
@@ -744,6 +882,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const float*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const float*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_flo");
                     break;
@@ -770,6 +921,19 @@ namespace art {
                             return res;
                         } else
                             return {ValueItem(val, meta)};
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res.insert(ValueItem(reinterpret_cast<const double*>(val)[i]));
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.val_len);
+                        for (uint32_t i = 0; i < meta.val_len; i++)
+                            res[i] = ValueItem(reinterpret_cast<const double*>(val)[i]);
+                        return res;
                     } else
                         throw InvalidCast("Fail cast raw_arr_doub");
                     break;
@@ -789,16 +953,31 @@ namespace art {
                     } else if constexpr (std::is_arithmetic_v<std::remove_pointer_t<T>> || std::is_same_v<T, ValueItem*>) {
                         if (meta.val_len) {
                             const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
-                            std::remove_pointer_t<T>* res = new std::remove_pointer_t<T>[meta.val_len];
-                            for (uint32_t i = 0; i < meta.val_len; i++) {
-                                const ValueItem& tmp = ref[i];
-                                res[i] = (std::remove_pointer_t<T>)tmp;
-                            }
+                            std::remove_pointer_t<T>* res = new std::remove_pointer_t<T>[ref.size()];
+                            ref.for_each([&](size_t i, const T& it) {
+                                res[i] = (std::remove_pointer_t<T>)it;
+                            });
                             return res;
                         } else
                             throw InvalidCast("Fail cast uarr");
                     } else if constexpr (std::is_same_v<T, list_array<ValueItem>>) {
                         return reinterpret_cast<const list_array<ValueItem>&>(val);
+                    } else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_set<ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.size());
+                        ref.for_each([&](const T& it) {
+                            res.insert(it);
+                        });
+                        return res;
+                    } else if constexpr (std::is_same_v<T, std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>) {
+                        const list_array<ValueItem>& ref = reinterpret_cast<const list_array<ValueItem>&>(val);
+                        std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
+                        res.reserve(meta.size());
+                        ref.for_each([&](size_t i, const T& it) {
+                            res[i] = it;
+                        });
+                        return res;
                     } else
                         throw InvalidCast("Fail cast uarr");
                     break;
@@ -819,6 +998,8 @@ namespace art {
                         return const_cast<void*>(val);
                     else if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T>)
                         return *reinterpret_cast<const T*>(&val);
                     else if constexpr (std::is_floating_point_v<std::remove_pointer_t<T>>)
@@ -834,6 +1015,8 @@ namespace art {
                 case VType::type_identifier: {
                     if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return {ValueItem(val, meta)};
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_arithmetic_v<T>)
                         return (T)meta.encoded;
                     else if constexpr (std::is_same_v<T, VType>)
@@ -847,6 +1030,8 @@ namespace art {
                 case VType::faarr: {
                     if constexpr (std::is_same_v<T, list_array<ValueItem>>)
                         return list_array<ValueItem>((ValueItem*)val, ((ValueItem*)val) + meta.val_len);
+                    else if constexpr (std::is_same_v<T, std::unordered_set<ValueItem, art::hash<ValueItem>>>)
+                        return {ValueItem(val, meta)};
                     else if constexpr (std::is_same_v<T, void*>)
                         return const_cast<void*>(val);
                     else if constexpr (std::is_arithmetic_v<T>)
@@ -942,6 +1127,8 @@ namespace art {
 
     void* AsArg(void** val);
     void AsArr(void** val);
+    void AsMap(void** val);
+    void AsSet(void** val);
 
     size_t getSize(void** value);
 

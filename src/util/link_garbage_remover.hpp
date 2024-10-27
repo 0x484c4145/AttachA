@@ -160,6 +160,10 @@ namespace art {
             *this = std::move(mov);
         }
 
+        template <class... Args>
+        typed_lgr(Args&&... args)
+            : typed_lgr(new T(std::forward<Args>(args)...)) {}
+
         typed_lgr& operator=(std::nullptr_t) {
             actual_lgr = nullptr;
             return *this;

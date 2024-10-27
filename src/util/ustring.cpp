@@ -30,21 +30,23 @@ namespace art {
         }
 
         std::unordered_map<size_t, dyn_pool_item*, art::hash<size_t>> dynamic_constant_pool_map;
-        TaskMutex dynamic_constant_pool_mutex;
+        TaskRWMutex dynamic_constant_pool_mutex;
 
         dyn_pool_item::~dyn_pool_item() {
             if (item.totalLinks() == 2) { // holder + map
-                art::lock_guard<TaskMutex> lock(dynamic_constant_pool_mutex);
+                art::unique_lock lock(dynamic_constant_pool_mutex);
                 dynamic_constant_pool_map.erase(item->hash);
             }
         }
 
         dyn_pool_item* dynamic_constant_pool(const class ustring& string) {
-            art::lock_guard<TaskMutex> lock(dynamic_constant_pool_mutex);
+            art::shared_lock lock(dynamic_constant_pool_mutex);
             auto it = dynamic_constant_pool_map.find(string.hash());
             if (it != dynamic_constant_pool_map.end())
                 return it->second;
             else {
+                lock.unlock();
+                art::unique_lock lock(dynamic_constant_pool_mutex);
                 dyn_pool_item* item = new dyn_pool_item;
                 item->item = as_pool(string);
                 return dynamic_constant_pool_map[string.hash()] = item;
@@ -72,11 +74,13 @@ namespace art {
                 throw InvalidEncodingException("String is not valid utf8");
 
             size_t hash = art::hash<char>()(string, size);
-            art::lock_guard<TaskMutex> lock(dynamic_constant_pool_mutex);
+            art::shared_lock lock(dynamic_constant_pool_mutex);
             auto it = dynamic_constant_pool_map.find(hash);
             if (it != dynamic_constant_pool_map.end())
                 return it->second;
             else {
+                lock.unlock();
+                art::unique_lock lock(dynamic_constant_pool_mutex);
                 dyn_pool_item* item = new dyn_pool_item;
                 item->item = as_pool(string, size, hash);
                 return dynamic_constant_pool_map[hash] = item;
@@ -110,16 +114,19 @@ namespace art {
         }
 
         std::unordered_map<size_t, pool_item*, art::hash<size_t>> constant_pool_map;
-        TaskMutex constant_pool_mutex;
+        TaskRWMutex constant_pool_mutex;
 
         pool_item* make_constant_pool(const ustring& string) {
             size_t hash = string.hash();
-            art::lock_guard<TaskMutex> lock(constant_pool_mutex);
+            art::shared_lock lock(constant_pool_mutex);
             auto it = constant_pool_map.find(hash);
             if (it != constant_pool_map.end())
                 return it->second;
-            else
+            else {
+                lock.unlock();
+                art::unique_lock lock(constant_pool_mutex);
                 return constant_pool_map[hash] = as_pool(string);
+            }
         }
 
         pool_item* make_constant_pool(const char* string) {
@@ -143,12 +150,15 @@ namespace art {
                 throw InvalidEncodingException("String is not valid utf8");
 
             size_t hash = art::hash<char>()(string, size);
-            art::lock_guard<TaskMutex> lock(constant_pool_mutex);
+            art::shared_lock lock(constant_pool_mutex);
             auto it = constant_pool_map.find(hash);
             if (it != constant_pool_map.end())
                 return it->second;
-            else
+            else {
+                lock.unlock();
+                art::unique_lock lock(constant_pool_mutex);
                 return constant_pool_map[hash] = as_pool(string, size, hash);
+            }
         }
 
         pool_item* make_constant_pool(const char8_t* string, size_t size) {
@@ -181,7 +191,7 @@ namespace art {
     void ustring::cleanup_current() {
         switch (flags.type) {
         case ustring::Type::def:
-            _data.d.larr.~list_array<char>();
+            _data.d.larr.~list_array();
             break;
         case ustring::Type::dyn_constant:
             _data.dynamic_constant_data.~shared_ptr();
@@ -296,7 +306,7 @@ namespace art {
             flags.has_data = true;
             flags.type = ustring::Type::def;
             new (&_data.d.larr) list_array<char>();
-            _data.d.larr.reserve_push_back(size);
+            _data.d.larr.reserve_back(size);
             utf8::replace_invalid(str, str + size, std::back_inserter(_data.d.larr));
         }
     }
@@ -724,7 +734,7 @@ namespace art {
         else {
             if (flags.type != ustring::Type::dyn_constant) {
                 switch_to_type(ustring::Type::def);
-                _data.d.larr.remove(begin - direct_ptr(), remove_points);
+                _data.d.larr.erase(begin - direct_ptr(), remove_points);
                 _data.d.larr.insert(begin - direct_ptr(), buff, insert_points);
                 flags.has_hash = false;
             } else {
@@ -758,7 +768,7 @@ namespace art {
         else {
             if (flags.type != ustring::Type::dyn_constant) {
                 switch_to_type(ustring::Type::def);
-                _data.d.larr.remove(begin - direct_ptr(), remove_points);
+                _data.d.larr.erase(begin - direct_ptr(), remove_points);
                 _data.d.larr.insert(begin - direct_ptr(), &c, 1);
                 flags.has_hash = false;
             } else {
@@ -784,17 +794,25 @@ namespace art {
 
     array_t<uint32_t> ustring::as_array_32() {
         list_array<uint32_t> res;
+        res.reserve(size());
         utf8::utf8to32(c_str(), c_str() + size(), std::back_inserter(res));
-        size_t len;
-        uint32_t* arr = res.take_raw(len);
+        size_t len = res.size();
+        uint32_t* arr = new uint32_t[len];
+        res.take().for_each([&](size_t index, uint32_t it) {
+            arr[index] = it;
+        });
         return array_t<uint32_t>(len, arr);
     }
 
     array_t<uint16_t> ustring::as_array_16() {
         list_array<uint16_t> res;
+        res.reserve(size());
         utf8::utf8to16(c_str(), c_str() + size(), std::back_inserter(res));
-        size_t len;
-        uint16_t* arr = res.take_raw(len);
+        size_t len = res.size();
+        uint16_t* arr = new uint16_t[len];
+        res.take().for_each([&](size_t index, uint16_t it) {
+            arr[index] = it;
+        });
         return array_t<uint16_t>(len, arr);
     }
 
@@ -848,17 +866,17 @@ namespace art {
 
     void ustring::reserve(size_t siz) {
         switch_to_type(ustring::Type::def);
-        _data.d.larr.reserve_push_back(siz);
+        _data.d.larr.reserve_back(siz);
     }
 
-    void ustring::reserve_push_back(size_t siz) {
+    void ustring::reserve_back(size_t siz) {
         switch_to_type(ustring::Type::def);
-        _data.d.larr.reserve_push_back(siz);
+        _data.d.larr.reserve_back(siz);
     }
 
-    void ustring::reserve_push_front(size_t siz) {
+    void ustring::reserve_front(size_t siz) {
         switch_to_type(ustring::Type::def);
-        _data.d.larr.reserve_push_front(siz);
+        _data.d.larr.reserve_front(siz);
     }
 
     void ustring::push_back(const ustring& c) {
@@ -1029,6 +1047,26 @@ namespace art {
             _data.d.larr.shrink_to_fit();
     }
 
+    size_t ustring::find(const ustring& c) const {
+        size_t self_siz = size();
+        size_t c_siz = c.size();
+        if (self_siz < c_siz)
+            return npos;
+        const char* self_begin = begin();
+        const char* self_end = end();
+
+        const char* c_begin = c.begin();
+        const char* c_end = c.end();
+
+        const char* self_ = self_begin;
+        while (self_ <= self_end - c_siz) {
+            if (std::equal(c_begin, c_end, self_))
+                return self_ - self_begin;
+            self_++;
+        }
+        return npos;
+    }
+
     size_t ustring::find_last_of(const ustring& c) const {
         size_t self_siz = size();
         size_t c_siz = c.size();
@@ -1067,5 +1105,31 @@ namespace art {
             self_++;
         }
         return npos;
+    }
+
+    list_array<ustring> ustring::split(const ustring& c) const {
+        list_array<ustring> res;
+        size_t self_siz = size();
+        size_t c_siz = c.size();
+        if (self_siz < c_siz)
+            return res;
+        const char* self_begin = begin();
+        const char* self_end = end();
+
+        const char* c_begin = c.begin();
+        const char* c_end = c.end();
+
+        const char* self_ = self_begin;
+        const char* last = self_;
+        while (self_ <= self_end - c_siz) {
+            if (std::equal(c_begin, c_end, self_)) {
+                res.push_back(ustring(last, self_ - last));
+                self_ += c_siz;
+                last = self_;
+            }
+            self_++;
+        }
+        res.push_back(ustring(last, self_end - last));
+        return res;
     }
 }

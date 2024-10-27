@@ -58,6 +58,19 @@ namespace art {
         }
     };
 
+    class AlreadyDefinedException : public virtual AttachARuntimeException {
+    public:
+        AlreadyDefinedException(const art::ustring& msq)
+            : AttachARuntimeException(msq) {}
+
+        AlreadyDefinedException(const art::ustring& msq, std::exception_ptr inner_exception)
+            : AttachARuntimeException(msq, inner_exception) {}
+
+        const char* name() const override {
+            return "already_defined_exception";
+        }
+    };
+
     class InvalidCast : public virtual AttachARuntimeException {
     public:
         InvalidCast(const art::ustring& msq)
@@ -213,38 +226,76 @@ namespace art {
         }
     };
 
-    class LibraryNotFoundException : public AttachARuntimeException {
+    class NotFoundException : public AttachARuntimeException {
     public:
-        LibraryNotFoundException()
-            : AttachARuntimeException("library not found") {}
+        NotFoundException()
+            : AttachARuntimeException("Not found") {}
 
-        LibraryNotFoundException(std::exception_ptr inner_exception)
-            : AttachARuntimeException("library not found", inner_exception) {}
+        NotFoundException(std::exception_ptr inner_exception)
+            : AttachARuntimeException("Not found", inner_exception) {}
 
-        LibraryNotFoundException(const art::ustring& desc)
+        NotFoundException(const art::ustring& desc)
             : AttachARuntimeException(desc) {}
 
-        LibraryNotFoundException(const art::ustring& desc, std::exception_ptr inner_exception)
+        NotFoundException(const art::ustring& desc, std::exception_ptr inner_exception)
             : AttachARuntimeException(desc, inner_exception) {}
+
+        const char* name() const override {
+            return "not_found_exception";
+        }
+    };
+
+    class LibraryNotFoundException : public NotFoundException {
+    public:
+        LibraryNotFoundException()
+            : NotFoundException("Library not found") {}
+
+        LibraryNotFoundException(std::exception_ptr inner_exception)
+            : NotFoundException("Library not found", inner_exception) {}
+
+        LibraryNotFoundException(const art::ustring& desc)
+            : NotFoundException(desc) {}
+
+        LibraryNotFoundException(const art::ustring& desc, std::exception_ptr inner_exception)
+            : NotFoundException(desc, inner_exception) {}
 
         const char* name() const override {
             return "library_not_found_exception";
         }
     };
 
-    class LibraryFunctionNotFoundException : public AttachARuntimeException {
+    class FunctionNotFoundException : public NotFoundException {
+    public:
+        FunctionNotFoundException()
+            : NotFoundException("function not found") {}
+
+        FunctionNotFoundException(std::exception_ptr inner_exception)
+            : NotFoundException("function not found", inner_exception) {}
+
+        FunctionNotFoundException(const art::ustring& desc)
+            : NotFoundException(desc) {}
+
+        FunctionNotFoundException(const art::ustring& desc, std::exception_ptr inner_exception)
+            : NotFoundException(desc, inner_exception) {}
+
+        const char* name() const override {
+            return "function_not_found_exception";
+        }
+    };
+
+    class LibraryFunctionNotFoundException : public FunctionNotFoundException {
     public:
         LibraryFunctionNotFoundException()
-            : AttachARuntimeException("library function not found") {}
+            : FunctionNotFoundException("library function not found") {}
 
         LibraryFunctionNotFoundException(std::exception_ptr inner_exception)
-            : AttachARuntimeException("library function not found", inner_exception) {}
+            : FunctionNotFoundException("library function not found", inner_exception) {}
 
         LibraryFunctionNotFoundException(const art::ustring& desc)
-            : AttachARuntimeException(desc) {}
+            : FunctionNotFoundException(desc) {}
 
         LibraryFunctionNotFoundException(const art::ustring& desc, std::exception_ptr inner_exception)
-            : AttachARuntimeException(desc, inner_exception) {}
+            : FunctionNotFoundException(desc, inner_exception) {}
 
         const char* name() const override {
             return "library_function_not_found_exception";

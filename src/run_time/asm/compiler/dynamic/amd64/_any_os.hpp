@@ -6,8 +6,15 @@
 
 #include <run_time/asm/compiler/compiler_include.hpp>
 
-
 namespace art {
+    namespace intrinsics {
+        void store_bool_from_resr(CASM& a) {
+            a.load_flag8h();
+            a.shift_left(resr_8l, RFLAGS::off_left::zero);
+            a.or_(resr_8h, resr_8l);
+            a.store_flag8h();
+        }
+    }
     inline void _inlineReleaseUnused(CASM& a, creg64 reg) {
         auto lab = a.newLabel();
         a.test(reg, reg);
@@ -17,6 +24,14 @@ namespace art {
         b.finalize(defaultDestructor<ValueItem>);
         a.label_bind(lab);
     }
+
+    inline void _inlineUseResult(CASM& a, const ValueIndexContext& context, ValueIndexPos value_index) {
+        BuildCall b(a, 2);
+        b.lea_valindex(context, value_index);
+        b.addArg(resr);
+        b.finalize(getValueItem);
+    }
+
 
     void Compiler::DynamicCompiler::jump(uint64_t label_id, JumpCondition condition) {
         auto& label = compiler.resolve_label(label_id);

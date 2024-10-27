@@ -153,7 +153,7 @@ namespace art {
             }
 
             void reserveArguments(size_t reserve) {
-                arguments.reserve_push_back(reserve);
+                arguments.reserve_back(reserve);
             }
         };
 

@@ -39,6 +39,10 @@ namespace art {
         case VType::faarr:
         case VType::function:
         case VType::struct_:
+        case VType::map:
+        case VType::set:
+        case VType::generator:
+
             return true;
         default:
             return false;
@@ -104,7 +108,7 @@ namespace art {
             uint32_t count = meta.val_len;
             for (uint32_t i = 0; i < count; i++)
                 universalFree((void**)&arr[i], arr[i].meta);
-            delete[] (ValueItem*)*value;
+            delete[] arr;
             break;
         }
         case VType::struct_:
@@ -112,6 +116,12 @@ namespace art {
             break;
         case VType::function:
             delete (art::shared_ptr<FuncEnvironment>*)*value;
+            break;
+        case VType::map:
+            delete (std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)*value;
+            break;
+        case VType::set:
+            delete (std::unordered_set<ValueItem, art::hash<ValueItem>>*)*value;
             break;
         default:
             if (needAlloc(meta))
@@ -141,8 +151,8 @@ namespace art {
             while (count--)
                 universalRemove((void**)begin++);
         }
-        meta.encoded = 0;
         *value = nullptr;
+        meta.encoded = 0;
     }
 
     void universalAlloc(void** value, ValueMeta meta) {
@@ -184,6 +194,12 @@ namespace art {
             case VType::faarr:
                 *value = new ValueItem[meta.val_len]();
                 break;
+            case VType::map:
+                *value = new std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>();
+                break;
+            case VType::set:
+                *value = new std::unordered_set<ValueItem, art::hash<ValueItem>>();
+                break;
             case VType::saarr:
                 throw InvalidOperation("Fail allocate local stack value");
                 break;
@@ -210,6 +226,7 @@ namespace art {
             case VType::i32:
             case VType::ui32:
             case VType::flo:
+            case VType::character:
                 destructor = defaultDestructor<uint32_t>;
                 *value = new uint32_t(0);
                 break;
@@ -264,16 +281,18 @@ namespace art {
             case VType::function:
                 destructor = defaultDestructor<art::shared_ptr<FuncEnvironment>>;
                 break;
+            case VType::map:
+                destructor = defaultDestructor<std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>;
+                break;
+            case VType::set:
+                destructor = defaultDestructor<std::unordered_set<ValueItem, art::hash<ValueItem>>>;
+                break;
             default:
                 break;
             }
             *value = new lgr(value, depth, destructor);
         }
         *(value + 1) = (void*)meta.encoded;
-    }
-
-    void removeArgsEnvironnement(list_array<ValueItem>* env) {
-        delete env;
     }
 
     ValueItem* getAsyncValueItem(void* val) {
@@ -401,21 +420,6 @@ namespace art {
             return actual_val;
     }
 
-    void** preSetValue(void** value, ValueMeta set_meta, bool match_gc_dif) {
-        void** res = &getValue(value);
-        ValueMeta& meta = *(ValueMeta*)(value + 1);
-        if (!needAlloc(meta)) {
-            if (match_gc_dif) {
-                if (meta.allow_edit && meta.vtype == set_meta.vtype && meta.use_gc == set_meta.use_gc)
-                    return res;
-            } else if (meta.allow_edit && meta.vtype == set_meta.vtype)
-                return res;
-        }
-        if (!meta.as_ref)
-            universalRemove(value);
-        *(value + 1) = (void*)set_meta.encoded;
-        return &getValue(value);
-    }
 
     void*& getValue(void*& value, ValueMeta& meta) {
         if (meta.vtype == VType::async_res)
@@ -1393,9 +1397,13 @@ namespace art {
                 ValueItem res;
                 res.meta.vtype = VType::faarr;
                 res.meta.allow_edit = true;
-                size_t size = 0;
-                res.val = tmp.take_raw(size);
-                res.meta.val_len = size;
+                size_t len = res.size();
+                ValueItem* arr = new ValueItem[len];
+                tmp.take().for_each([&](size_t index, ValueItem&& it) {
+                    arr[index] = it;
+                });
+                res.val = arr;
+                res.meta.val_len = len;
                 return res;
             } else if (str.starts_with('{')) {
                 std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>> res;
@@ -1602,6 +1610,9 @@ namespace art {
         case VType::doub:
             reinterpret_cast<double&>(actual_val0) += (double)val1_r;
             break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) += (uint32_t)val1_r;
+            break;
         case VType::uarr:
             reinterpret_cast<list_array<ValueItem>*>(actual_val0)->push_back(val1_r);
             break;
@@ -1669,6 +1680,9 @@ namespace art {
             break;
         case VType::doub:
             reinterpret_cast<double&>(actual_val0) -= (double)val1_r;
+            break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) -= (uint32_t)val1_r;
             break;
         case VType::uarr:
             reinterpret_cast<list_array<ValueItem>*>(actual_val0)->push_back(val1_r);
@@ -1738,6 +1752,9 @@ namespace art {
         case VType::doub:
             reinterpret_cast<double&>(actual_val0) *= (double)val1_r;
             break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) *= (uint32_t)val1_r;
+            break;
         case VType::uarr:
             reinterpret_cast<list_array<ValueItem>*>(actual_val0)->push_back(val1_r);
             break;
@@ -1797,6 +1814,9 @@ namespace art {
         case VType::doub:
             reinterpret_cast<double&>(actual_val0) /= (double)val1_r;
             break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) /= (uint32_t)val1_r;
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) /= (size_t)val1_r;
             break;
@@ -1847,6 +1867,9 @@ namespace art {
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) %= (uint64_t)val1_r;
             break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) %= (uint32_t)val1_r;
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) %= (size_t)val1_r;
             break;
@@ -1871,37 +1894,40 @@ namespace art {
             val0_r = 1;
             break;
         case VType::i8:
-            reinterpret_cast<int8_t&>(actual_val0)++;
+            ++reinterpret_cast<int8_t&>(actual_val0);
             break;
         case VType::i16:
-            reinterpret_cast<int16_t&>(actual_val0)++;
+            ++reinterpret_cast<int16_t&>(actual_val0);
             break;
         case VType::i32:
-            reinterpret_cast<int32_t&>(actual_val0)++;
+            ++reinterpret_cast<int32_t&>(actual_val0);
             break;
         case VType::i64:
-            reinterpret_cast<int64_t&>(actual_val0)++;
+            ++reinterpret_cast<int64_t&>(actual_val0);
             break;
         case VType::ui8:
-            reinterpret_cast<uint8_t&>(actual_val0)++;
+            ++reinterpret_cast<uint8_t&>(actual_val0);
             break;
         case VType::ui16:
-            reinterpret_cast<uint16_t&>(actual_val0)++;
+            ++reinterpret_cast<uint16_t&>(actual_val0);
             break;
         case VType::ui32:
-            reinterpret_cast<uint32_t&>(actual_val0)++;
+            ++reinterpret_cast<uint32_t&>(actual_val0);
             break;
         case VType::ui64:
-            reinterpret_cast<uint64_t&>(actual_val0)++;
+            ++reinterpret_cast<uint64_t&>(actual_val0);
             break;
         case VType::flo:
-            reinterpret_cast<float&>(actual_val0)++;
+            ++reinterpret_cast<float&>(actual_val0);
             break;
         case VType::doub:
-            reinterpret_cast<double&>(actual_val0)++;
+            ++reinterpret_cast<double&>(actual_val0);
+            break;
+        case VType::character:
+            ++reinterpret_cast<uint32_t&>(actual_val0);
             break;
         case VType::undefined_ptr:
-            reinterpret_cast<size_t&>(actual_val0)++;
+            ++reinterpret_cast<size_t&>(actual_val0);
             break;
         case VType::struct_:
             art::CXX::Interface::makeCall(ClassAccess::pub, val0_r, symbols::structures::increment_operator);
@@ -1924,37 +1950,40 @@ namespace art {
             val0_r = -1;
             break;
         case VType::i8:
-            reinterpret_cast<int8_t&>(actual_val0)--;
+            --reinterpret_cast<int8_t&>(actual_val0);
             break;
         case VType::i16:
-            reinterpret_cast<int16_t&>(actual_val0)--;
+            --reinterpret_cast<int16_t&>(actual_val0);
             break;
         case VType::i32:
-            reinterpret_cast<int32_t&>(actual_val0)--;
+            --reinterpret_cast<int32_t&>(actual_val0);
             break;
         case VType::i64:
-            reinterpret_cast<int64_t&>(actual_val0)--;
+            --reinterpret_cast<int64_t&>(actual_val0);
             break;
         case VType::ui8:
-            reinterpret_cast<uint8_t&>(actual_val0)--;
+            --reinterpret_cast<uint8_t&>(actual_val0);
             break;
         case VType::ui16:
-            reinterpret_cast<uint16_t&>(actual_val0)--;
+            --reinterpret_cast<uint16_t&>(actual_val0);
             break;
         case VType::ui32:
-            reinterpret_cast<uint32_t&>(actual_val0)--;
+            --reinterpret_cast<uint32_t&>(actual_val0);
             break;
         case VType::ui64:
-            reinterpret_cast<uint64_t&>(actual_val0)--;
+            --reinterpret_cast<uint64_t&>(actual_val0);
             break;
         case VType::flo:
-            reinterpret_cast<float&>(actual_val0)--;
+            --reinterpret_cast<float&>(actual_val0);
             break;
         case VType::doub:
-            reinterpret_cast<double&>(actual_val0)--;
+            --reinterpret_cast<double&>(actual_val0);
+            break;
+        case VType::character:
+            --reinterpret_cast<uint32_t&>(actual_val0);
             break;
         case VType::undefined_ptr:
-            reinterpret_cast<size_t&>(actual_val0)--;
+            --reinterpret_cast<size_t&>(actual_val0);
             break;
         case VType::struct_:
             art::CXX::Interface::makeCall(ClassAccess::pub, val0_r, symbols::structures::decrement_operator);
@@ -2002,6 +2031,19 @@ namespace art {
             break;
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) ^= (uint64_t)val1_r;
+            break;
+        case VType::flo: {
+            auto val1_c = (float)val1_r;
+            reinterpret_cast<uint32_t&>(actual_val0) ^= reinterpret_cast<uint32_t&>(val1_c);
+            break;
+        }
+        case VType::doub: {
+            auto val1_c = (double)val1_r;
+            reinterpret_cast<uint64_t&>(actual_val0) ^= reinterpret_cast<uint64_t&>(val1_c);
+            break;
+        }
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) ^= (uint32_t)val1_r;
             break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) ^= (size_t)val1_r;
@@ -2053,6 +2095,19 @@ namespace art {
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) |= (uint64_t)val1_r;
             break;
+        case VType::flo: {
+            auto val1_c = (float)val1_r;
+            reinterpret_cast<uint32_t&>(actual_val0) |= reinterpret_cast<uint32_t&>(val1_c);
+            break;
+        }
+        case VType::doub: {
+            auto val1_c = (double)val1_r;
+            reinterpret_cast<uint64_t&>(actual_val0) |= reinterpret_cast<uint64_t&>(val1_c);
+            break;
+        }
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) |= (uint32_t)val1_r;
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) |= (size_t)val1_r;
             break;
@@ -2102,6 +2157,19 @@ namespace art {
             break;
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) &= (uint64_t)val1_r;
+            break;
+        case VType::flo: {
+            auto val1_c = (float)val1_r;
+            reinterpret_cast<uint32_t&>(actual_val0) &= reinterpret_cast<uint32_t&>(val1_c);
+            break;
+        }
+        case VType::doub: {
+            auto val1_c = (double)val1_r;
+            reinterpret_cast<uint64_t&>(actual_val0) &= reinterpret_cast<uint64_t&>(val1_c);
+            break;
+        }
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) &= (uint32_t)val1_r;
             break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) &= (size_t)val1_r;
@@ -2153,6 +2221,15 @@ namespace art {
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) >>= (uint64_t)val1_r;
             break;
+        case VType::flo:
+            reinterpret_cast<uint32_t&>(actual_val0) >>= (uint32_t)val1_r;
+            break;
+        case VType::doub:
+            reinterpret_cast<uint64_t&>(actual_val0) >>= (uint64_t)val1_r;
+            break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) >>= (uint32_t)val1_r;
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) >>= (size_t)val1_r;
             break;
@@ -2203,6 +2280,15 @@ namespace art {
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) <<= (uint64_t)val1_r;
             break;
+        case VType::flo:
+            reinterpret_cast<uint32_t&>(actual_val0) <<= (uint32_t)val1_r;
+            break;
+        case VType::doub:
+            reinterpret_cast<uint64_t&>(actual_val0) <<= (uint64_t)val1_r;
+            break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) <<= (uint32_t)val1_r;
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) <<= (size_t)val1_r;
             break;
@@ -2250,6 +2336,15 @@ namespace art {
         case VType::ui64:
             reinterpret_cast<uint64_t&>(actual_val0) = ~reinterpret_cast<uint64_t&>(actual_val0);
             break;
+        case VType::flo:
+            reinterpret_cast<uint32_t&>(actual_val0) = ~reinterpret_cast<uint32_t&>(actual_val0);
+            break;
+        case VType::doub:
+            reinterpret_cast<uint64_t&>(actual_val0) = ~reinterpret_cast<uint64_t&>(actual_val0);
+            break;
+        case VType::character:
+            reinterpret_cast<uint32_t&>(actual_val0) = ~reinterpret_cast<uint32_t&>(actual_val0);
+            break;
         case VType::undefined_ptr:
             reinterpret_cast<size_t&>(actual_val0) = ~reinterpret_cast<size_t&>(actual_val0);
             break;
@@ -2270,7 +2365,8 @@ namespace art {
             list_array<ValueItem>& vil = *reinterpret_cast<list_array<ValueItem>*>(*val);
             if (vil.size() > UINT32_MAX)
                 throw InvalidCast("Fail cast uarr to faarr due too large array");
-            *value = ValueItem(vil.to_array(), (uint32_t)vil.size());
+
+            *value = ValueItem(vil.to_array(vil.get_allocator()), (uint32_t)vil.size());
             return value->getSourcePtr();
         } else {
             *value = ValueItem(std::initializer_list<ValueItem>{std::move(*(ValueItem*)(val))});
@@ -2283,12 +2379,40 @@ namespace art {
         if (meta.vtype == VType::uarr)
             return;
         else {
-            auto tmp = new list_array<ValueItem>(ABI_IMPL::Vcast<list_array<ValueItem>>(*val, meta));
             universalRemove(val);
+            auto tmp = new list_array<ValueItem>(ABI_IMPL::Vcast<list_array<ValueItem>>(*val, meta));
             *val = tmp;
             meta.allow_edit = true;
             meta.use_gc = false;
             meta.vtype = VType::uarr;
+        }
+    }
+
+    void AsMap(void** val) {
+        ValueMeta& meta = *((ValueMeta*)val + 1);
+        if (meta.vtype == VType::map)
+            return;
+        else {
+            universalRemove(val);
+            auto tmp = new std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>(ABI_IMPL::Vcast<std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>>(*val, meta));
+            *val = tmp;
+            meta.allow_edit = true;
+            meta.use_gc = false;
+            meta.vtype = VType::map;
+        }
+    }
+
+    void AsSet(void** val) {
+        ValueMeta& meta = *((ValueMeta*)val + 1);
+        if (meta.vtype == VType::set)
+            return;
+        else {
+            universalRemove(val);
+            auto tmp = new std::unordered_set<ValueItem, art::hash<ValueItem>>(ABI_IMPL::Vcast<std::unordered_set<ValueItem, art::hash<ValueItem>>>(*val, meta));
+            *val = tmp;
+            meta.allow_edit = true;
+            meta.use_gc = false;
+            meta.vtype = VType::set;
         }
     }
 
@@ -2328,6 +2452,9 @@ namespace art {
             break;
         case VType::doub:
             ABI_IMPL::setValue(ABI_IMPL::Vcast<double>(*val, meta), val);
+            break;
+        case VType::character:
+            ABI_IMPL::setValue(ABI_IMPL::Vcast<char32_t>(*val, meta), val);
             break;
         case VType::uarr:
             ABI_IMPL::setValue(ABI_IMPL::Vcast<list_array<ValueItem>>(*val, meta), val);
@@ -2376,15 +2503,16 @@ namespace art {
             return *(uint16_t*)val;
         case VType::i32:
         case VType::ui32:
+        case VType::character:
+        case VType::flo:
             return *(uint32_t*)value;
         case VType::ui64:
         case VType::i64:
-            return *(uint64_t*)value;
-        case VType::flo:
-            return *(float*)value;
         case VType::doub:
-            return *(double*)value;
+            return *(uint64_t*)value;
         case VType::uarr:
+            return ((list_array<ValueItem>*)value)->size();
+        case VType::map:
             return ((list_array<ValueItem>*)value)->size();
         case VType::string:
             return ((art::ustring*)value)->size();
@@ -2554,6 +2682,9 @@ namespace art {
 
     ValueItem::ValueItem(double val)
         : val(*reinterpret_cast<void**>(&val)), meta(VType::doub) {}
+
+    ValueItem::ValueItem(char32_t val)
+        : val(*reinterpret_cast<void**>(&val)), meta(VType::character) {}
 
     ValueItem::ValueItem(const art::ustring& set)
         : val(new art::ustring(set)), meta(VType::string) {}
@@ -2877,6 +3008,12 @@ namespace art {
         meta.as_ref = true;
     }
 
+    ValueItem::ValueItem(char32_t& val, as_reference_t) {
+        this->val = &val;
+        meta = VType::character;
+        meta.as_ref = true;
+    }
+
     ValueItem::ValueItem(art::ustring& val, as_reference_t) {
         this->val = &val;
         meta = VType::string;
@@ -3017,6 +3154,13 @@ namespace art {
     ValueItem::ValueItem(const double& val, as_reference_t) {
         this->val = (void*)&val;
         meta = VType::doub;
+        meta.as_ref = true;
+        meta.allow_edit = false;
+    }
+
+    ValueItem::ValueItem(const char32_t& val, as_reference_t) {
+        this->val = (void*)&val;
+        meta = VType::character;
         meta.as_ref = true;
         meta.allow_edit = false;
     }

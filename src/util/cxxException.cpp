@@ -8,8 +8,9 @@
 #include <util/platform.hpp>
 #include <util/ustring.hpp>
 #ifdef PLATFORM_WINDOWS
-#include <string>
-#include <windows.h>
+    #include <string>
+    #define NOMINMAX
+    #include <windows.h>
 
 namespace art {
     namespace except_abi {

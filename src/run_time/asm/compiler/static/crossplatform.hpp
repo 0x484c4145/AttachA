@@ -8,6 +8,7 @@
 
 namespace art {
     void _inlineReleaseUnused(CASM& a, creg64 reg);
+    void _inlineUseResult(CASM& a, creg64 reg);
     void Compiler::StaticCompiler::remove(const ValueIndexPos& value_index, ValueMeta value_index_meta) {
         if (needAlloc(value_index_meta)) {
             switch (value_index_meta.vtype) {
@@ -355,9 +356,9 @@ namespace art {
             b.lea_valindex({compiler.static_map, compiler.values}, value);
         }
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(size_t, const ValueItem&)) & list_array<ValueItem>::insert);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const ValueItem&)&)&list_array<ValueItem>::insert);
         else
-            b.finalize((void(list_array<ValueItem>::*)(size_t, ValueItem&&)) & list_array<ValueItem>::insert);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, ValueItem&&)&)&list_array<ValueItem>::insert);
     }
     void Compiler::StaticCompiler::ArrayOperation::push_end(const ValueIndexPos& value) {
         if (array_meta.allow_edit == false)
@@ -371,9 +372,9 @@ namespace art {
         b.mov_valindex({compiler.static_map, compiler.values}, array);
         b.lea_valindex({compiler.static_map, compiler.values}, value);
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(ValueItem&&)) & list_array<ValueItem>::push_back);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(ValueItem&&)&)&list_array<ValueItem>::push_back);
         else
-            b.finalize((void(list_array<ValueItem>::*)(const ValueItem&)) & list_array<ValueItem>::push_back);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(const ValueItem&)&)&list_array<ValueItem>::push_back);
     }
     void Compiler::StaticCompiler::ArrayOperation::push_start(const ValueIndexPos& value) {
         if (array_meta.allow_edit == false)
@@ -387,11 +388,12 @@ namespace art {
         b.mov_valindex({compiler.static_map, compiler.values}, array);
         b.lea_valindex({compiler.static_map, compiler.values}, value);
         if (flags.move_mode)
-            b.finalize((void(list_array<ValueItem>::*)(ValueItem&&)) & list_array<ValueItem>::push_front);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(ValueItem&&)&)&list_array<ValueItem>::push_front);
         else
-            b.finalize((void(list_array<ValueItem>::*)(const ValueItem&)) & list_array<ValueItem>::push_front);
+            b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(const ValueItem&)&)&list_array<ValueItem>::push_front);
     }
-    void Compiler::StaticCompiler::ArrayOperation::insert_range(const ValueIndexPos& array2, ValueMeta array2_meta, const ValueIndexPos& index, const ValueIndexPos& from2, const ValueIndexPos& to2) {
+
+    void Compiler::StaticCompiler::ArrayOperation::insert_range(const ValueIndexPos& array2, ValueMeta array2_meta, const ValueIndexPos& index) {
         BuildCall b(compiler.a, 1);
         if (array_meta.allow_edit == false)
             throw InvalidOperation("Cannot edit constant value");
@@ -406,119 +408,20 @@ namespace art {
             b.lea_valindex({compiler.static_map, compiler.values}, array2);
             b.finalize(AsArr);
         }
-        if (index.pos == ValuePos::in_constants && from2.pos == ValuePos::in_constants && to2.pos == ValuePos::in_constants) {
-            b.setArguments(5);
+        if (index.pos == ValuePos::in_constants) {
+            b.setArguments(3);
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(compiler.get_size_constant(index));
             b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (index.pos == ValuePos::in_constants && from2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index));
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(resr);
-        } else if (index.pos == ValuePos::in_constants && to2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index));
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(resr);
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (from2.pos == ValuePos::in_constants && to2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr);
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            b.addArg(compiler.get_size_constant(to2));
-        } else if (index.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0); //align
-
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-            compiler.a.pop(); //align
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(compiler.get_size_constant(index));
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(resr);
-            compiler.a.pop(resr);
-            b.addArg(resr);
-        } else if (from2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0); //align
-
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-            compiler.a.pop(); //align
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr);
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            b.addArg(compiler.get_size_constant(from2));
-            compiler.a.pop(resr);
-            b.addArg(resr);
-        } else if (to2.pos == ValuePos::in_constants) {
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0); //align
-
-            b.lea_valindex({compiler.static_map, compiler.values}, index);
-            b.finalize(getSize);
-            compiler.a.pop(); //align
-
-            b.setArguments(5);
-            b.mov_valindex({compiler.static_map, compiler.values}, array);
-            b.addArg(resr);
-            b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            compiler.a.pop(resr);
-            b.addArg(resr);
-            b.addArg(compiler.get_size_constant(to2));
         } else {
-            b.lea_valindex({compiler.static_map, compiler.values}, to2);
-            b.finalize(getSize);
-            compiler.a.push(resr);
-            compiler.a.push(0); //align
-
-            b.lea_valindex({compiler.static_map, compiler.values}, from2);
-            b.finalize(getSize);
-            compiler.a.pop(); //align
-            compiler.a.push(resr);
-
             b.lea_valindex({compiler.static_map, compiler.values}, index);
             b.finalize(getSize);
-
-
-            b.setArguments(5);
+            b.setArguments(3);
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr); //index
             b.mov_valindex({compiler.static_map, compiler.values}, array2);
-            compiler.a.pop(resr);
-            b.addArg(resr); //from
-            compiler.a.pop(resr);
-            b.addArg(resr); //to
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, const list_array<ValueItem>&, size_t, size_t)) & list_array<ValueItem>::insert);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const list_array<ValueItem>&)&)&list_array<ValueItem>::insert);
     }
     void Compiler::StaticCompiler::ArrayOperation::get(const ValueIndexPos& index, const ValueIndexPos& set) {
         if (!is_raw_array(array_meta.vtype) && array_meta.vtype != VType::uarr) {
@@ -739,7 +642,7 @@ namespace art {
         }
         BuildCall b(compiler.a, 2);
         b.mov_valindex({compiler.static_map, compiler.values}, array);
-        b.finalize(&list_array<ValueItem>::pop_back);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)()&)&list_array<ValueItem>::pop_back);
     }
     void Compiler::StaticCompiler::ArrayOperation::pop_start() {
         if (array_meta.allow_edit == false)
@@ -752,7 +655,7 @@ namespace art {
         }
         BuildCall b(compiler.a, 2);
         b.mov_valindex({compiler.static_map, compiler.values}, array);
-        b.finalize(&list_array<ValueItem>::pop_front);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)()&)&list_array<ValueItem>::pop_front);
     }
     void Compiler::StaticCompiler::ArrayOperation::remove_item(const ValueIndexPos& index) {
         if (array_meta.allow_edit == false)
@@ -776,7 +679,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::remove);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t)&)&list_array<ValueItem>::erase);
     }
     void Compiler::StaticCompiler::ArrayOperation::remove_range(const ValueIndexPos& from, const ValueIndexPos& to) {
         if (array_meta.allow_edit == false)
@@ -826,7 +729,7 @@ namespace art {
             compiler.a.pop(argr2);
             b.addArg(argr2);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, size_t)) & list_array<ValueItem>::remove);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, size_t)&)&list_array<ValueItem>::erase);
     }
     void Compiler::StaticCompiler::ArrayOperation::resize(const ValueIndexPos& new_size) {
         if (array_meta.allow_edit == false)
@@ -850,7 +753,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::resize);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t)&)&list_array<ValueItem>::resize);
     }
     void Compiler::StaticCompiler::ArrayOperation::resize_default(const ValueIndexPos& new_size, const ValueIndexPos& default_value) {
         if (array_meta.allow_edit == false)
@@ -876,7 +779,7 @@ namespace art {
             b.addArg(resr);
             b.lea_valindex({compiler.static_map, compiler.values}, default_value);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t, const ValueItem&)) & list_array<ValueItem>::resize);
+        b.finalize((list_array<ValueItem> & (list_array<ValueItem>::*)(size_t, const ValueItem&)&)&list_array<ValueItem>::resize);
     }
     void Compiler::StaticCompiler::ArrayOperation::reserve_push_end(const ValueIndexPos& count) {
         if (array_meta.allow_edit == false)
@@ -900,7 +803,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::reserve_push_back);
+        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::reserve_back);
     }
     void Compiler::StaticCompiler::ArrayOperation::reserve_push_start(const ValueIndexPos& count) {
         if (array_meta.allow_edit == false)
@@ -924,7 +827,7 @@ namespace art {
             b.mov_valindex({compiler.static_map, compiler.values}, array);
             b.addArg(resr);
         }
-        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::reserve_push_front);
+        b.finalize((void(list_array<ValueItem>::*)(size_t)) & list_array<ValueItem>::reserve_front);
     }
 
     void Compiler::StaticCompiler::ArrayOperation::commit() {
@@ -1024,68 +927,447 @@ namespace art {
         compiler.dynamic().load_bool(to);
     }
 
-    void Compiler::StaticCompiler::call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function(flags, fn_symbol, structure_, access);
-    }
-    void Compiler::StaticCompiler::call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function(flags, fn_symbol, structure_, access, res);
+    ValueItem* _valueItemStaticCall_async(shared_ptr<FuncEnvironment>& env, ValueItem* args, uint32_t len) {
+        return FuncEnvironment::async_call(env, args, len);
     }
 
-    void Compiler::StaticCompiler::call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function_id(flags, id, structure_);
-    }
-    void Compiler::StaticCompiler::call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& res, ValueMeta res_meta) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function_id(flags, id, structure_, res);
+    ValueItem* valueItemStaticCall_async(shared_ptr<FuncEnvironment>& async_call, ValueItem* class_ptr, ValueItem* args, uint32_t len) {
+        if (!class_ptr)
+            throw NullPointerException();
+        if (len == UINT32_MAX)
+            throw InvalidArguments("Too many arguments");
+
+        class_ptr->getAsync();
+        list_array<ValueItem> args_tmp;
+        args_tmp.reserve_back(len + 1);
+        args_tmp.push_back(ValueItem(*class_ptr, as_reference));
+        for (uint32_t i = 0; i < len; i++)
+            args_tmp.push_back(ValueItem(args[i], as_reference));
+        FuncEnvironment::async_call(async_call, args_tmp.data(), args_tmp.size());
     }
 
+    ValueItem* valueItemStaticCall_sync(Environment sync_call, ValueItem* class_ptr, ValueItem* args, uint32_t len) {
+        if (!class_ptr)
+            throw NullPointerException();
+        if (len == UINT32_MAX)
+            throw InvalidArguments("Too many arguments");
 
-    void Compiler::StaticCompiler::call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function_and_ret(flags, fn_symbol, structure_, access);
-    }
-    void Compiler::StaticCompiler::call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_) {
-        //TODO: optimize
-        compiler.dynamic().call_value_function_id_and_ret(flags, id, structure_);
+        class_ptr->getAsync();
+        list_array<ValueItem> args_tmp;
+        args_tmp.reserve_back(len + 1);
+        args_tmp.push_back(ValueItem(*class_ptr, as_reference));
+        for (uint32_t i = 0; i < len; i++)
+            args_tmp.push_back(ValueItem(args[i], as_reference));
+        sync_call(args_tmp.data(), args_tmp.size());
     }
 
-    void Compiler::StaticCompiler::static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access) {
-        //TODO: optimize
-        compiler.dynamic().static_call_value_function(flags, fn_symbol, structure_, access);
+    bool Compiler::StaticCompiler::_inline_valueItemCall_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (structure_name.pos != ValuePos::in_constants || separator.pos != ValuePos::in_constants)
+            throw InvalidArguments("`structure_name` and `separator` must be a constants");
+
+
+        auto structure_name_ = *compiler.get_string_constant(structure_name);
+        auto res = attacha_environment::get_types_global().find_auto_join(structure_name_, *compiler.get_string_constant(separator));
+        if (flags.always_dynamic) {
+            switch (res.mode) {
+                using enum Structure::VTableMode;
+            case undefined:
+            case ___unused:
+                break;
+            case AttachAVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.regular->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(method->get_func_ptr());
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_sync);
+                        return;
+                    } catch (const InvalidOperation& op) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.regular->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(&method);
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_async);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            case AttachADynamicVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(method->get_func_ptr());
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_sync);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(&method);
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_async);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        return false;
     }
-    void Compiler::StaticCompiler::static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta) {
-        //TODO: optimize
+
+    bool Compiler::StaticCompiler::_inline_valueItemCall_named(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (structure_name.pos != ValuePos::in_constants || separator.pos != ValuePos::in_constants)
+            throw InvalidArguments("`structure_name` and `separator` must be a constants");
+
+        auto structure_name_ = *compiler.get_string_constant(structure_name);
+        auto res = attacha_environment::get_types_global().find_auto_join(structure_name_, *compiler.get_string_constant(separator));
+        if (fn_symbol.pos == ValuePos::in_constants && flags.always_dynamic) {
+            auto& fn = *compiler.get_string_constant(fn_symbol);
+            switch (res.mode) {
+                using enum Structure::VTableMode;
+            case undefined:
+            case ___unused:
+                break;
+            case AttachAVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.regular->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(method->get_func_ptr());
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_sync);
+                        return true;
+                    } catch (const InvalidOperation& op) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.regular->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(&method);
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_async);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            case AttachADynamicVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(method->get_func_ptr());
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_sync);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 4);
+                        b.addArg(&method);
+                        b.lea_valindex({compiler.static_map, compiler.values}, structure_);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(valueItemStaticCall_async);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    bool Compiler::StaticCompiler::_inline_valueItemStaticCall_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (structure_name.pos != ValuePos::in_constants || separator.pos != ValuePos::in_constants)
+            throw InvalidArguments("`structure_name` and `separator` must be a constants");
+
+
+        auto structure_name_ = *compiler.get_string_constant(structure_name);
+        auto res = attacha_environment::get_types_global().find_auto_join(structure_name_, *compiler.get_string_constant(separator));
+        if (flags.always_dynamic) {
+            switch (res.mode) {
+                using enum Structure::VTableMode;
+            case undefined:
+            case ___unused:
+                break;
+            case AttachAVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto& method = res.regular->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 2);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(method->get_func_ptr());
+                        return;
+                    } catch (const InvalidOperation& op) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto& method = res.regular->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 3);
+                        b.addArg(&method);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(FuncEnvironment::asyncWrapper);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            case AttachADynamicVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto& method = res.regular->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 2);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(method->get_func_ptr());
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto& method = res.dynamic->getMethodInfo(id).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 3);
+                        b.addArg(&method);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(FuncEnvironment::asyncWrapper);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + std::to_string(id) + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    bool Compiler::StaticCompiler::_inline_valueItemStaticCall_named(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (structure_name.pos != ValuePos::in_constants || separator.pos != ValuePos::in_constants)
+            throw InvalidArguments("`structure_name` and `separator` must be a constants");
+
+        auto structure_name_ = *compiler.get_string_constant(structure_name);
+        auto res = attacha_environment::get_types_global().find_auto_join(structure_name_, *compiler.get_string_constant(separator));
+        if (fn_symbol.pos == ValuePos::in_constants && flags.always_dynamic) {
+            auto& fn = *compiler.get_string_constant(fn_symbol);
+            switch (res.mode) {
+                using enum Structure::VTableMode;
+            case undefined:
+            case ___unused:
+                break;
+            case AttachAVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.regular->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 2);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(method->get_func_ptr());
+                        return true;
+                    } catch (const InvalidOperation& op) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.regular->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 3);
+                        b.addArg(&method);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(FuncEnvironment::asyncWrapper);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            case AttachADynamicVirtualTable:
+                if (!flags.async_mode) {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 2);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(method->get_func_ptr());
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                } else {
+                    try {
+                        auto method = res.dynamic->getMethodInfo(fn, access).ref;
+                        compiler.used_environs.push_back(method);
+                        BuildCall b(compiler.a, 3);
+                        b.addArg(&method);
+                        b.addArg(arg_ptr);
+                        b.addArg(arg_len_32);
+                        b.finalize(FuncEnvironment::asyncWrapper);
+                        return true;
+                    } catch (const InvalidOperation&) {
+                        throw CompileTimeException("Compiler failed to resolve " + fn + " method from " + structure_name_, std::current_exception());
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    void Compiler::StaticCompiler::call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (_inline_valueItemCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            _inlineReleaseUnused(compiler.a, resr);
+        else
+            compiler.dynamic().call_value_function(flags, fn_symbol, structure_, access);
+    }
+
+    void Compiler::StaticCompiler::call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta) {
+        if (_inline_valueItemCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            _inlineUseResult(compiler.a, {compiler.static_map, compiler.values}, res);
+        else
+            compiler.dynamic().call_value_function(flags, fn_symbol, structure_, access, res);
+    }
+
+    void Compiler::StaticCompiler::call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (_inline_valueItemCall_id(flags, id, structure_, structure_name, separator))
+            _inlineReleaseUnused(compiler.a, resr);
+        else
+            compiler.dynamic().call_value_function_id(flags, id, structure_);
+    }
+
+    void Compiler::StaticCompiler::call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& res, ValueMeta res_meta) {
+        if (_inline_valueItemCall_id(flags, id, structure_, structure_name, separator))
+            _inlineUseResult(compiler.a, {compiler.static_map, compiler.values}, res);
+        else
+            compiler.dynamic().call_value_function_id(flags, id, structure_, res);
+    }
+
+    void Compiler::StaticCompiler::call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (_inline_valueItemCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            compiler.a.jmp(compiler.prolog);
+        else
+            compiler.dynamic().call_value_function_and_ret(flags, fn_symbol, structure_, access);
+    }
+
+    void Compiler::StaticCompiler::call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (_inline_valueItemCall_id(flags, id, structure_, structure_name, separator))
+            compiler.a.jmp(compiler.prolog);
+        else
+            compiler.dynamic().call_value_function_id_and_ret(flags, id, structure_);
+    }
+
+    void Compiler::StaticCompiler::static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (_inline_valueItemStaticCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            _inlineReleaseUnused(compiler.a, resr);
+        else
+            compiler.dynamic().static_call_value_function(flags, fn_symbol, structure_, access);
+    }
+
+    void Compiler::StaticCompiler::static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta) {
+        if (_inline_valueItemStaticCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            _inlineUseResult(compiler.a, {compiler.static_map, compiler.values}, res);
+        else
+            compiler.dynamic().static_call_value_function(flags, fn_symbol, structure_, access);
         compiler.dynamic().static_call_value_function(flags, fn_symbol, structure_, access, res);
     }
 
-    void Compiler::StaticCompiler::static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_) {
-        //TODO: optimize
-        compiler.dynamic().static_call_value_function_id(flags, id, structure_);
-    }
-    void Compiler::StaticCompiler::static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& res, ValueMeta res_meta) {
-        //TODO: optimize
-        compiler.dynamic().static_call_value_function_id(flags, id, structure_, res);
+    void Compiler::StaticCompiler::static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (_inline_valueItemStaticCall_id(flags,id, structure_, structure_name, separator))
+            _inlineReleaseUnused(compiler.a, resr);
+        else compiler.dynamic().static_call_value_function_id(flags, id, structure_);
     }
 
+    void Compiler::StaticCompiler::static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& res, ValueMeta res_meta) {
+        if (_inline_valueItemStaticCall_id(flags, id, structure_, structure_name, separator))
+            _inlineUseResult(compiler.a, {compiler.static_map, compiler.values}, res);
+        else
+            compiler.dynamic().static_call_value_function_id(flags, id, structure_, res);
+    }
 
-    void Compiler::StaticCompiler::static_call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access) {
-        //TODO: optimize
+    void Compiler::StaticCompiler::static_call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access) {
+        if (_inline_valueItemStaticCall_named(flags, fn_symbol, fn_symbol_meta, structure_, structure_name, separator, access))
+            compiler.a.jmp(compiler.prolog);
+        else
+            compiler.dynamic().static_call_value_function(flags, fn_symbol, structure_, access);
         compiler.dynamic().static_call_value_function_and_ret(flags, fn_symbol, structure_, access);
     }
-    void Compiler::StaticCompiler::static_call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_) {
-        //TODO: optimize
-        compiler.dynamic().static_call_value_function_id_and_ret(flags, id, structure_);
+
+    void Compiler::StaticCompiler::static_call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator) {
+        if (_inline_valueItemStaticCall_id(flags, id, structure_, structure_name, separator))
+            compiler.a.jmp(compiler.prolog);
+        else
+            compiler.dynamic().static_call_value_function_id_and_ret(flags, id, structure_);
     }
 
-
-    void Compiler::StaticCompiler::set_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& value, ValueMeta value_meta) {
+    void Compiler::StaticCompiler::set_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& value, ValueMeta value_meta) {
         //TODO: optimize
         compiler.dynamic().set_structure_value(value_name, access, structure_, value);
     }
-    void Compiler::StaticCompiler::get_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& to, ValueMeta to_meta) {
+
+    void Compiler::StaticCompiler::get_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& to, ValueMeta to_meta) {
         //TODO: optimize
         compiler.dynamic().get_structure_value(value_name, access, structure_, to);
     }
@@ -1137,5 +1419,150 @@ namespace art {
     void Compiler::StaticCompiler::move_unreference(const ValueIndexPos& set, ValueMeta set_meta, const ValueIndexPos& from, ValueMeta from_meta) {
         //TODO: optimize
         compiler.dynamic().move_unreference(set, from);
+    }
+
+    void Compiler::StaticCompiler::remove_qualifiers(const ValueIndexPos& value) {
+        //TODO: optimize
+        compiler.dynamic().remove_qualifiers(value);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::set(const ValueIndexPos& index, const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 3);
+        if (index.pos == ValuePos::in_constants) {
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexMapSetMoveStatic : helper_functions::IndexMapSetCopyStatic);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::get(const ValueIndexPos& index, const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 3);
+        if (index.pos == ValuePos::in_constants) {
+            b.lea_valindex({compiler.static_map, compiler.values}, set);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.lea_valindex({compiler.static_map, compiler.values}, set);
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexMapGetMoveStatic : helper_functions::IndexMapGetCopyStatic);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::contains(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 2);
+        if (index.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexMapContainsStatic);
+        helper_functions::intrinsics::store_bool_from_resr(compiler.a);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::remove_item(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 2);
+        if (index.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(compiler.get_size_constant(index));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexMapRemoveStatic);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::reserve(const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 2);
+        if (value.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.addArg(compiler.get_size_constant(value));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, map);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+        }
+        b.finalize(helper_functions::IndexMapReserveStatic);
+    }
+
+    void Compiler::StaticCompiler::MapOperation::size(const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 2);
+        b.lea_valindex({compiler.static_map, compiler.values}, set);
+        b.mov_valindex({compiler.static_map, compiler.values}, map);
+        b.finalize(helper_functions::IndexMapSizeStatic);
+    }
+
+    void Compiler::StaticCompiler::SetOperation::set(const ValueIndexPos& index, const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 3);
+        if (index.pos == ValuePos::in_constants) {
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(move_mode ? helper_functions::IndexSetSetMoveStatic : helper_functions::IndexSetSetCopyStatic);
+    }
+
+    void Compiler::StaticCompiler::SetOperation::contains(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 2);
+        if (index.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexSetContainsStatic);
+        helper_functions::intrinsics::store_bool_from_resr(compiler.a);
+    }
+
+    void Compiler::StaticCompiler::SetOperation::remove_item(const ValueIndexPos& index) {
+        BuildCall b(compiler.a, 2);
+        if (index.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(&compiler.get_constant(index));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, index);
+        }
+        b.finalize(helper_functions::IndexSetRemoveStatic);
+    }
+
+    void Compiler::StaticCompiler::SetOperation::reserve(const ValueIndexPos& value) {
+        BuildCall b(compiler.a, 2);
+        if (value.pos == ValuePos::in_constants) {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.addArg(compiler.get_size_constant(value));
+        } else {
+            b.mov_valindex({compiler.static_map, compiler.values}, _set);
+            b.lea_valindex({compiler.static_map, compiler.values}, value);
+        }
+        b.finalize(helper_functions::IndexSetReserveStatic);
+    }
+
+    void Compiler::StaticCompiler::SetOperation::size(const ValueIndexPos& set) {
+        BuildCall b(compiler.a, 2);
+        b.lea_valindex({compiler.static_map, compiler.values}, set);
+        b.mov_valindex({compiler.static_map, compiler.values}, _set);
+        b.finalize(helper_functions::IndexSetSizeStatic);
+    }
+
+    void Compiler::StaticCompiler::global_get(const ValueIndexPos& set, const ValueIndexPos& location, const ValueIndexPos& separator) {
+        //TODO: optimize
+        compiler.dynamic().global_set(set, location, separator);
+    }
+
+    void Compiler::StaticCompiler::global_set(const ValueIndexPos& to, const ValueIndexPos& location, const ValueIndexPos& separator) {
+        //TODO: optimize
+        compiler.dynamic().global_set(to, location, separator);
     }
 }

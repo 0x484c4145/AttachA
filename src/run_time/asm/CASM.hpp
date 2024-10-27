@@ -5,16 +5,17 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #pragma once
-#ifndef RUN_TIME_CASM
-#define RUN_TIME_CASM
-#include <asmjit/asmjit.h>
-#include <cassert>
-#include <run_time/attacha_abi_structs.hpp>
-#include <unordered_map>
-#include <util/cxxException.hpp>
-#include <util/exceptions.hpp>
-#include <util/platform.hpp>
-#include <vector>
+#ifndef SRC_RUN_TIME_ASM_CASM
+    #define SRC_RUN_TIME_ASM_CASM
+    #include <asmjit/asmjit.h>
+    #include <cassert>
+    #include <run_time/asm/attacha_environment.hpp>
+    #include <run_time/attacha_abi_structs.hpp>
+    #include <unordered_map>
+    #include <util/cxxException.hpp>
+    #include <util/exceptions.hpp>
+    #include <util/platform.hpp>
+    #include <vector>
 
 namespace art {
     using asmjit::CodeHolder;
@@ -1089,7 +1090,7 @@ namespace art {
             return a.newLabel();
         }
 
-        void offsettable(asmjit::Label table, creg index, creg result) {
+        void offsettable(const asmjit::Label& table, creg index, creg result) {
             a.mov(result, asmjit::x86::ptr(table, index, 0, 0, result.size()));
         }
 
@@ -1106,7 +1107,7 @@ namespace art {
             return label;
         }
 
-        asmjit::Label add_label_ptr(asmjit::Label l) {
+        asmjit::Label add_label_ptr(const asmjit::Label& l) {
             a.section(data);
             asmjit::Label label = a.newLabel();
             a.bind(label);
@@ -1125,21 +1126,21 @@ namespace art {
             return label;
         }
 
-        void bind_data(asmjit::Label label, char* bytes, size_t size) {
+        void bind_data(const asmjit::Label& label, char* bytes, size_t size) {
             a.section(data);
             a.bind(label);
             a.embed(bytes, size);
             a.section(text);
         }
 
-        void bind_label_ptr(asmjit::Label label, asmjit::Label l) {
+        void bind_label_ptr(const asmjit::Label& label, asmjit::Label l) {
             a.section(data);
             a.bind(label);
             a.embedLabel(l);
             a.section(text);
         }
 
-        void bind_table(asmjit::Label label, const std::vector<asmjit::Label>& labels) {
+        void bind_table(const asmjit::Label& label, const std::vector<asmjit::Label>& labels) {
             a.section(data);
             a.bind(label);
             for (auto& l : labels)
@@ -1149,6 +1150,13 @@ namespace art {
 
         size_t offset() {
             return a.offset();
+        }
+
+        uint64_t label_offset(const Label& label) {
+            if (a.isLabelValid(label))
+                return a.code()->labelOffset(label);
+            else
+                throw CompileTimeException("This label is unbound");
         }
 
         void sub(creg res, creg val) {
@@ -1232,10 +1240,12 @@ namespace art {
     };
 
     struct StackTraceItem {
+        constexpr inline static size_t nline = -1;
+        constexpr inline static size_t ncolumn = -1;
         art::ustring fn_name;
         art::ustring file_path;
         size_t line;
-        constexpr static size_t nline = -1;
+        size_t column = ncolumn;
     };
 
     struct UWINFO_head {
@@ -1343,7 +1353,7 @@ namespace art {
         bool use_handle = false;
 
         //return unwind_info_ptr
-        void* init(uint8_t*& frame, CodeHolder* code, const char* symbol_name = "AttachA unnamed_symbol", const char* file_path = "");
+        void* init(uint8_t*& frame, CodeHolder* code, list_array<art::frame_info::line_info>& line_info, const char* symbol_name = "AttachA unnamed_symbol", const char* file_path = "");
         static bool deinit(uint8_t* frame, void* funct);
         static std::vector<void*> JitCaptureStackChainTrace(uint32_t framesToSkip = 0, bool includeNativeFrames = true, uint32_t max_frames = 32);
         static std::vector<StackTraceItem> JitCaptureStackTrace(uint32_t framesToSkip = 0, bool includeNativeFrames = true, uint32_t max_frames = 32);
@@ -2063,4 +2073,4 @@ namespace art {
 #error INVALID BUILD ARCHITECTURE, supported only x64 or aarch64 archetectures
 #endif
 }
-#endif
+#endif /* SRC_RUN_TIME_ASM_CASM */

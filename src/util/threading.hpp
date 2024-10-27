@@ -143,6 +143,29 @@ namespace art {
         Mutex* mutex() const {
             return &_mtx;
         }
+
+        void lock() {
+            if (!_locked) {
+                _mtx->lock_shared();
+                _locked = true;
+            } else
+                throw InvalidLock("Program tried lock locked mutex");
+        }
+
+        bool try_lock() {
+            if (!_locked)
+                return _locked = _mtx->try_lock_shared();
+            else
+                throw InvalidLock("Program tried lock locked mutex");
+        }
+
+        void unlock() {
+            if (_locked) {
+                _mtx->unlock_shared();
+                _locked = false;
+            } else
+                throw InvalidLock("Program tried unlock unlocked mutex");
+        }
     };
 
     template <class Mutex>

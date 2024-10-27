@@ -93,20 +93,7 @@ namespace art {
         std::vector<ValueItem*> static_map;
 
     public:
-        Compiler(CASM& a,
-                 ScopeManager& scope,
-                 ScopeManagerMap& scope_map,
-                 Label& prolog,
-                 Label& self_function,
-                 std::vector<uint8_t>& data,
-                 size_t data_len,
-                 size_t start_from,
-                 list_array<std::pair<uint64_t, Label>>& jump_list,
-                 list_array<ValueItem>& values,
-                 bool in_debug,
-                 FuncHandle::inner_handle* build_func,
-                 uint16_t static_values,
-                 list_array<art::shared_ptr<FuncEnvironment>>& used_environs)
+        Compiler(CASM& a, ScopeManager& scope, ScopeManagerMap& scope_map, Label& prolog, Label& self_function, std::vector<uint8_t>& data, size_t data_len, size_t start_from, list_array<std::pair<uint64_t, Label>>& jump_list, list_array<ValueItem>& values, bool in_debug, FuncHandle::inner_handle* build_func, uint16_t static_values, list_array<art::shared_ptr<FuncEnvironment>>& used_environs)
             : a(a), scope(scope), scope_map(scope_map), prolog(prolog), self_function(self_function), data(data), data_len(data_len), i(start_from), skip_count(start_from), values(values), in_debug(in_debug), build_func(build_func), used_environs(used_environs) {
             label_bind_map.reserve(jump_list.size());
             label_map.reserve(jump_list.size());
@@ -116,6 +103,10 @@ namespace art {
             }
             for (uint16_t j = 0; j < static_values; j++)
                 static_map.push_back(&values[j]);
+        }
+
+        uint64_t label_offset(const Label& label) {
+            return a.label_offset(label);
         }
 
         std::vector<ValueItem*>& get_static_map() {
@@ -229,7 +220,7 @@ namespace art {
                 void insert(const ValueIndexPos& index, const ValueIndexPos& value);
                 void push_end(const ValueIndexPos& value);
                 void push_start(const ValueIndexPos& value);
-                void insert_range(const ValueIndexPos& array2, const ValueIndexPos& index, const ValueIndexPos& from2, const ValueIndexPos& to2);
+                void insert_range(const ValueIndexPos& array2, const ValueIndexPos& index);
                 void get(const ValueIndexPos& index, const ValueIndexPos& set);
                 void take(const ValueIndexPos& index, const ValueIndexPos& set);
                 void take_end(const ValueIndexPos& set);
@@ -329,6 +320,48 @@ namespace art {
             void copy_unreference(const ValueIndexPos& set, const ValueIndexPos& from);
             void move_unreference(const ValueIndexPos& set, const ValueIndexPos& from);
             void remove_qualifiers(const ValueIndexPos& value);
+
+            void global_get(const ValueIndexPos& set, const ValueIndexPos& from, const ValueIndexPos& separator);
+            void global_set(const ValueIndexPos& set, const ValueIndexPos& from, const ValueIndexPos& separator);
+
+            struct MapOperation {
+                Compiler& compiler;
+                ValueIndexPos map;
+                bool move_mode;
+
+                MapOperation(Compiler& compiler, const ValueIndexPos& map, bool move_mode)
+                    : compiler(compiler), map(map), move_mode(move_mode) {}
+
+                void set(const ValueIndexPos& index, const ValueIndexPos& value);
+                void get(const ValueIndexPos& index, const ValueIndexPos& set);
+                void contains(const ValueIndexPos& index);
+                void remove_item(const ValueIndexPos& index);
+                void reserve(const ValueIndexPos& value);
+                void size(const ValueIndexPos& set);
+            };
+
+            struct SetOperation {
+                Compiler& compiler;
+                ValueIndexPos _set;
+                bool move_mode;
+
+                SetOperation(Compiler& compiler, const ValueIndexPos& _set, bool move_mode)
+                    : compiler(compiler), _set(_set), move_mode(move_mode) {}
+
+                void set(const ValueIndexPos& index, const ValueIndexPos& value);
+                void contains(const ValueIndexPos& index);
+                void remove_item(const ValueIndexPos& index);
+                void reserve(const ValueIndexPos& value);
+                void size(const ValueIndexPos& set);
+            };
+
+            MapOperation map_op(const ValueIndexPos& array, bool move_mode) {
+                return MapOperation(compiler, array, move_mode);
+            }
+
+            SetOperation set_op(const ValueIndexPos& array, bool move_mode) {
+                return SetOperation(compiler, array, move_mode);
+            }
         };
 
         DynamicCompiler dynamic() {
@@ -383,7 +416,7 @@ namespace art {
                 void insert(const ValueIndexPos& index, const ValueIndexPos& value);
                 void push_end(const ValueIndexPos& value);
                 void push_start(const ValueIndexPos& value);
-                void insert_range(const ValueIndexPos& array2, ValueMeta array2_meta, const ValueIndexPos& index, const ValueIndexPos& from2, const ValueIndexPos& to2);
+                void insert_range(const ValueIndexPos& array2, ValueMeta array2_meta, const ValueIndexPos& index);
                 void get(const ValueIndexPos& index, const ValueIndexPos& set);
                 void take(const ValueIndexPos& index, const ValueIndexPos& set);
                 void take_end(const ValueIndexPos& set);
@@ -412,29 +445,29 @@ namespace art {
             void store_bool(const ValueIndexPos& from, ValueMeta from_meta);
             void load_bool(const ValueIndexPos& to, ValueMeta to_meta);
 
-            void call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access);
-            void call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta);
+            void call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
+            void call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta);
 
-            void call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_);
-            void call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& res, ValueMeta res_meta);
-
-
-            void call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access);
-            void call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_);
-
-            void static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access);
-            void static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta);
-
-            void static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_);
-            void static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& res, ValueMeta res_meta);
+            void call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+            void call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& res, ValueMeta res_meta);
 
 
-            void static_call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, ClassAccess access);
-            void static_call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_);
+            void call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
+            void call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+
+            void static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
+            void static_call_value_function(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access, const ValueIndexPos& res, ValueMeta res_meta);
+
+            void static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+            void static_call_value_function_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& res, ValueMeta res_meta);
 
 
-            void set_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& value, ValueMeta value_meta);
-            void get_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& to, ValueMeta to_meta);
+            void static_call_value_function_and_ret(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
+            void static_call_value_function_id_and_ret(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+
+
+            void set_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& value, ValueMeta value_meta);
+            void get_structure_value(const ValueIndexPos& value_name, ClassAccess access, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, const ValueIndexPos& to, ValueMeta to_meta);
 
             void explicit_await(const ValueIndexPos& value, ValueMeta value_meta);
             void generator_get(const ValueIndexPos& generator, const ValueIndexPos& to, ValueMeta to_meta, const ValueIndexPos& result_index);
@@ -452,6 +485,60 @@ namespace art {
             void copy_unconst(const ValueIndexPos& set, ValueMeta set_meta, const ValueIndexPos& from, ValueMeta from_meta);
             void copy_unreference(const ValueIndexPos& set, ValueMeta set_meta, const ValueIndexPos& from, ValueMeta from_meta);
             void move_unreference(const ValueIndexPos& set, ValueMeta set_meta, const ValueIndexPos& from, ValueMeta from_meta);
+            void remove_qualifiers(const ValueIndexPos& value);
+
+
+            void global_get(const ValueIndexPos& to, const ValueIndexPos& location, const ValueIndexPos& separator);
+            void global_set(const ValueIndexPos& from, const ValueIndexPos& location, const ValueIndexPos& separator);
+
+            struct MapOperation {
+                Compiler& compiler;
+                ValueIndexPos map;
+                bool move_mode;
+
+                MapOperation(Compiler& compiler, const ValueIndexPos& map, bool move_mode)
+                    : compiler(compiler), map(map), move_mode(move_mode) {}
+
+                void set(const ValueIndexPos& index, const ValueIndexPos& value);
+                void get(const ValueIndexPos& index, const ValueIndexPos& set);
+                void contains(const ValueIndexPos& index);
+                void remove_item(const ValueIndexPos& index);
+                void reserve(const ValueIndexPos& value);
+                void size(const ValueIndexPos& set);
+            };
+
+            struct SetOperation {
+                Compiler& compiler;
+                ValueIndexPos _set;
+                bool move_mode;
+
+                SetOperation(Compiler& compiler, const ValueIndexPos& _set, bool move_mode)
+                    : compiler(compiler), _set(_set), move_mode(move_mode) {}
+
+                void set(const ValueIndexPos& index, const ValueIndexPos& value);
+                void contains(const ValueIndexPos& index);
+                void remove_item(const ValueIndexPos& index);
+                void reserve(const ValueIndexPos& value);
+                void size(const ValueIndexPos& set);
+            };
+
+            MapOperation map_op(const ValueIndexPos& array, bool move_mode) {
+                return MapOperation(compiler, array, move_mode);
+            }
+
+            SetOperation set_op(const ValueIndexPos& array, bool move_mode) {
+                return SetOperation(compiler, array, move_mode);
+            }
+
+        private:
+            bool _inline_valueItemCall_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+
+            bool _inline_valueItemCall_named(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
+
+
+            bool _inline_valueItemStaticCall_id(CallFlags flags, uint64_t id, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator);
+
+            bool _inline_valueItemStaticCall_named(CallFlags flags, const ValueIndexPos& fn_symbol, ValueMeta fn_symbol_meta, const ValueIndexPos& structure_, const ValueIndexPos& structure_name, const ValueIndexPos& separator, ClassAccess access);
         };
 
         StaticCompiler static_() {

@@ -69,7 +69,7 @@ namespace art {
         inline list_array<ValueItem> readAnyUarr(const std::vector<uint8_t>& data, size_t data_len, size_t& i) {
             uint64_t len = readData<uint64_t>(data, data_len, i);
             list_array<ValueItem> uarr;
-            uarr.reserve_push_back(len);
+            uarr.reserve_back(len);
             while (len--) {
                 uarr.push_back(readAny(data, data_len, i));
             }

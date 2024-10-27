@@ -6,6 +6,7 @@
 
 #include <attacha/configuration/agreement/symbols.hpp>
 #include <run_time/AttachA_CXX.hpp>
+#include <run_time/asm/attacha_environment.hpp>
 #include <run_time/library/parallel.hpp>
 #include <util/threading.hpp>
 
@@ -176,6 +177,8 @@ namespace art {
                 CXX::Interface::direct_method("notify_all", funs_ConditionVariable_notify_all)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskConditionVariable>>() = define_ConditionVariable;
+            define_ConditionVariable->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_ConditionVariable);
+            attacha_environment::get_types_global().join_namespace({"parallel", "condition_variable"})->value = define_ConditionVariable;
         }
 
 #pragma endregion
@@ -231,6 +234,8 @@ namespace art {
                 CXX::Interface::direct_method("sequence_lock", funs_Mutex_sequence_lock)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskMutex>>() = define_Mutex;
+            define_Mutex->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_Mutex);
+            attacha_environment::get_types_global().join_namespace({"parallel", "mutex"})->value = define_Mutex;
         }
 
 #pragma endregion
@@ -327,6 +332,8 @@ namespace art {
                 CXX::Interface::direct_method("is_own", funs_RWMutex_is_own)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskRWMutex>>() = define_RWMutex;
+            define_RWMutex->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_RWMutex);
+            attacha_environment::get_types_global().join_namespace({"parallel", "rw_mutex"})->value = define_RWMutex;
         }
 
 #pragma endregion
@@ -382,6 +389,8 @@ namespace art {
                 CXX::Interface::direct_method("sequence_lock", funs_RecursiveMutex_sequence_lock)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskRecursiveMutex>>() = define_RecursiveMutex;
+            define_RecursiveMutex->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_RecursiveMutex);
+            attacha_environment::get_types_global().join_namespace({"parallel", "recursive_mutex"})->value = define_RecursiveMutex;
         }
 #pragma endregion
 #pragma region Semaphore
@@ -426,6 +435,8 @@ namespace art {
                 CXX::Interface::direct_method("is_locked", funs_Semaphore_is_locked)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskSemaphore>>() = define_Semaphore;
+            define_Semaphore->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_Semaphore);
+            attacha_environment::get_types_global().join_namespace({"parallel", "semaphore"})->value = define_Semaphore;
         }
 
 #pragma endregion
@@ -520,6 +531,8 @@ namespace art {
                 CXX::Interface::direct_method("clear", funs_EventSystem_clear)
             );
             CXX::Interface::typeVTable<typed_lgr<EventSystem>>() = define_EventSystem;
+            define_EventSystem->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_EventSystem);
+            attacha_environment::get_types_global().join_namespace({"parallel", "event_system"})->value = define_EventSystem;
         }
 
 #pragma endregion
@@ -566,6 +579,8 @@ namespace art {
                 CXX::Interface::direct_method("is_locked", funs_TaskLimiter_is_locked)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskLimiter>>() = define_TaskLimiter;
+            define_TaskLimiter->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_TaskLimiter);
+            attacha_environment::get_types_global().join_namespace({"parallel", "task_limiter"})->value = define_TaskLimiter;
         }
 
 #pragma endregion
@@ -615,6 +630,8 @@ namespace art {
                 CXX::Interface::direct_method("get_max_at_execution", funs_TaskQuery_get_max_at_execution)
             );
             CXX::Interface::typeVTable<typed_lgr<TaskQuery>>() = define_TaskQuery;
+            define_TaskQuery->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_TaskQuery);
+            attacha_environment::get_types_global().join_namespace({"parallel", "task_query"})->value = define_TaskQuery;
         }
 
 #pragma endregion
@@ -700,6 +717,7 @@ namespace art {
                 CXX::Interface::direct_method(symbols::structures::iterable::end, funs_TaskResultIterator_end)
             );
             CXX::Interface::typeVTable<TaskResultIterator>() = define_TaskResultIterator;
+            attacha_environment::get_types_global().join_namespace({"parallel", "task", "task_result_iterator"})->value = define_TaskResultIterator;
         }
 
 #pragma endregion
@@ -786,14 +804,20 @@ namespace art {
             if (task->fres.results.size() > UINT32_MAX)
                 throw InvalidCast("Task internal result array is too large to convert to an array");
             else if constexpr (std::is_same_v<T, ValueItem>)
-                return ValueItem(task->fres.results.data(), task->fres.results.size());
+                return ValueItem(task->fres.results.data(), task->fres.results.size(), no_copy);
             else {
-                size_t len;
-                auto res = task->fres.results.convert<T>([](ValueItem& item) {
-                                                 return (T)item;
-                                             })
-                               .take_raw(len);
-                return ValueItem(res, len, no_copy);
+                size_t len = task->fres.results.size();
+                ValueItem* extracted = new ValueItem[len];
+                task
+                    ->fres
+                    .results
+                    .convert<T>([](const ValueItem& item) {
+                        return (T)item;
+                    })
+                    .for_each([&](size_t index, ValueItem&& it) {
+                        extracted[index] = std::move(it);
+                    });
+                return ValueItem(extracted, len, no_copy);
             }
         });
         AttachAFun(funs_Task_begin, 1, {
@@ -855,6 +879,8 @@ namespace art {
                 CXX::Interface::direct_method(symbols::structures::iterable::end, funs_Task_end)
             );
             CXX::Interface::typeVTable<art::typed_lgr<Task>>() = define_Task;
+            define_Task->getAfterMethods()->constructor = new FuncEnvironment(constructor::construct_Task);
+            attacha_environment::get_types_global().join_namespace({"parallel", "task"})->value = define_Task;
         }
 
 #pragma endregion
@@ -892,11 +918,19 @@ namespace art {
 
             if (results.size() > UINT32_MAX)
                 throw InvalidCast("Task internal result array is too large to convert to an array");
-            else if constexpr (std::is_same_v<T, ValueItem>)
-                return ValueItem(results.data(), results.size());
-            else {
-                size_t len;
-                auto res = results.convert<T>([](ValueItem& item) { return (T)item; }).take_raw(len);
+            else if constexpr (std::is_same_v<T, ValueItem>) {
+                size_t len = results.size();
+                ValueItem* res = new ValueItem[len];
+                results.take().for_each([&](size_t index, T&& it) {
+                    res[index] = std::move(it);
+                });
+                return ValueItem(res, len, no_copy);
+            } else {
+                size_t len = results.size();
+                T* res = new T[len];
+                results.convert_take<T>([](ValueItem&& item) { return (T)item; }).for_each([&](size_t index, T&& it) {
+                    res[index] = std::move(it);
+                });
                 return ValueItem(res, len, no_copy);
             }
         });
@@ -985,6 +1019,8 @@ namespace art {
                 CXX::Interface::direct_method(symbols::structures::add_operator, funs_TaskGroup_add)
             );
             CXX::Interface::typeVTable<list_array<art::typed_lgr<Task>>>() = define_TaskGroup;
+            define_TaskGroup->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_TaskGroup);
+            attacha_environment::get_types_global().join_namespace({"parallel", "task_group"})->value = define_TaskGroup;
         }
 
 #pragma endregion
@@ -1060,6 +1096,7 @@ namespace art {
                 CXX::Interface::direct_method(symbols::structures::iterable::end, funs_GeneratorResultIterator_end)
             );
             CXX::Interface::typeVTable<GeneratorResultIterator>() = define_GeneratorResultIterator;
+            attacha_environment::get_types_global().join_namespace({"parallel", "generator", "task_result_iterator"})->value = define_GeneratorResultIterator;
         }
 
 #pragma endregion
@@ -1119,12 +1156,18 @@ namespace art {
             if (result.size() > UINT32_MAX)
                 throw InvalidCast("Generator result array is too large to convert to an array, data lost");
             else if constexpr (std::is_same_v<T, ValueItem>) {
-                size_t len;
-                ValueItem* res = result.take_raw(len);
+                size_t len = result.size();
+                ValueItem* res = new ValueItem[len];
+                result.take().for_each([&](size_t index, T&& it) {
+                    res[index] = std::move(it);
+                });
                 return ValueItem(res, len, no_copy);
             } else {
-                size_t len;
-                auto res = result.convert_take<T>([](ValueItem&& item) { return (T)item; }).take_raw(len);
+                size_t len = result.size();
+                T* res = new T[len];
+                result.convert_take<T>([](ValueItem&& item) { return (T)item; }).for_each([&](size_t index, T&& it) {
+                    res[index] = std::move(it);
+                });
                 return ValueItem(res, len, no_copy);
             }
         });
@@ -1179,41 +1222,69 @@ namespace art {
                 CXX::Interface::direct_method(symbols::structures::iterable::end, funs_Generator_end)
             );
             CXX::Interface::typeVTable<art::shared_ptr<Generator>>() = define_Generator;
+            define_Generator->getAfterMethods()->constructor = new FuncEnvironment(constructor::construct_Generator);
+            attacha_environment::get_types_global().join_namespace({"parallel", "generator"})->value = define_Generator;
         }
 
 #pragma endregion
 
         namespace constructor {
-            ValueItem* createProxy_ConditionVariable(ValueItem*, uint32_t) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskConditionVariable>>(define_ConditionVariable, new TaskConditionVariable()), no_copy);
+            ValueItem* createProxy_ConditionVariable(ValueItem* val, uint32_t len) {
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskConditionVariable>>(define_ConditionVariable, new TaskConditionVariable()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskConditionVariable>>(define_ConditionVariable, CXX::Interface::getExtractAs<typed_lgr<TaskConditionVariable>>(*val, define_ConditionVariable)), no_copy);
             }
 
-            ValueItem* createProxy_Mutex(ValueItem*, uint32_t) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskMutex>>(define_Mutex, new TaskMutex()), no_copy);
+            ValueItem* createProxy_Mutex(ValueItem* val, uint32_t len) {
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskMutex>>(define_Mutex, new TaskMutex()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskMutex>>(define_Mutex, CXX::Interface::getExtractAs<typed_lgr<TaskMutex>>(*val, define_Mutex)), no_copy);
             }
 
-            ValueItem* createProxy_RWMutex(ValueItem*, uint32_t) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRWMutex>>(define_RWMutex, new TaskRWMutex()), no_copy);
+            ValueItem* createProxy_RWMutex(ValueItem* val, uint32_t len) {
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRWMutex>>(define_RWMutex, new TaskRWMutex()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRWMutex>>(define_RWMutex, CXX::Interface::getExtractAs<typed_lgr<TaskRWMutex>>(*val, define_RWMutex)), no_copy);
             }
 
-            ValueItem* createProxy_RecursiveMutex(ValueItem*, uint32_t) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRecursiveMutex>>(define_RecursiveMutex, new TaskRecursiveMutex()), no_copy);
+            ValueItem* createProxy_RecursiveMutex(ValueItem* val, uint32_t len) {
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRecursiveMutex>>(define_RecursiveMutex, new TaskRecursiveMutex()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskRecursiveMutex>>(define_RecursiveMutex, CXX::Interface::getExtractAs<typed_lgr<TaskRecursiveMutex>>(*val, define_RecursiveMutex)), no_copy);
             }
 
-            ValueItem* createProxy_Semaphore(ValueItem*, uint32_t) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskSemaphore>>(define_Semaphore, new TaskSemaphore()), no_copy);
+            ValueItem* createProxy_Semaphore(ValueItem* val, uint32_t len) {
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskSemaphore>>(define_Semaphore, new TaskSemaphore()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskSemaphore>>(define_Semaphore, CXX::Interface::getExtractAs<typed_lgr<TaskSemaphore>>(*val, define_Semaphore)), no_copy);
             }
 
             ValueItem* createProxy_EventSystem(ValueItem* val, uint32_t len) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<EventSystem>>(define_EventSystem, new EventSystem()), no_copy);
+                if(!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<EventSystem>>(define_EventSystem, new EventSystem()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<EventSystem>>(define_EventSystem, CXX::Interface::getExtractAs<typed_lgr<EventSystem>>(*val, define_EventSystem)), no_copy);
             }
 
             ValueItem* createProxy_TaskLimiter(ValueItem* val, uint32_t len) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskLimiter>>(define_TaskLimiter, new TaskLimiter()), no_copy);
+                if (!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskLimiter>>(define_TaskLimiter, new TaskLimiter()), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskLimiter>>(define_TaskLimiter, CXX::Interface::getExtractAs<typed_lgr<TaskLimiter>>(*val, define_TaskLimiter)), no_copy);
             }
 
             ValueItem* createProxy_TaskQuery(ValueItem* val, uint32_t len) {
-                return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskQuery>>(define_TaskQuery, new TaskQuery(len ? (size_t)*val : 0)), no_copy);
+                if(!len)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskQuery>>(define_TaskQuery, new TaskQuery(0)), no_copy);
+                else if(val->meta.vtype == VType::struct_)
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskQuery>>(define_TaskQuery, CXX::Interface::getAs<typed_lgr<TaskQuery>>(*(Structure*)val)), no_copy);
+                else
+                    return new ValueItem(CXX::Interface::constructStructure<typed_lgr<TaskQuery>>(define_TaskQuery, new TaskQuery((size_t)*val)), no_copy);
             }
 
             AttachAFun(construct_Task, 1, {
@@ -1250,7 +1321,7 @@ namespace art {
                     return new ValueItem(CXX::Interface::constructStructure<list_array<art::typed_lgr<Task>>>(define_TaskGroup), no_copy);
                 else {
                     list_array<art::typed_lgr<Task>> tasks;
-                    tasks.reserve_push_back(len);
+                    tasks.reserve_back(len);
                     for (uint32_t i = 0; i < len; i++)
                         ___createProxy_TaskGroup__push_item(tasks, val[i]);
                     return new ValueItem(CXX::Interface::constructStructure<list_array<art::typed_lgr<Task>>>(define_TaskGroup, std::move(tasks)), no_copy);
@@ -1589,7 +1660,7 @@ namespace art {
                     return args[1];
                 });
 
-                static void init() {
+                static void init(art::Environment constructor) {
                     if constexpr (std::is_integral_v<T> && !std::is_floating_point_v<T> && !std::is_same_v<T, bool>) {
                         art::ustring type_name;
                         if constexpr (std::is_same_v<T, int8_t>)
@@ -1617,6 +1688,8 @@ namespace art {
                         virtual_table = CXX::Interface::createTable<AtomicBasic<T>>("atomic_boolean", CXX::Interface::direct_method(symbols::structures::not_equal_operator, __not_equal), CXX::Interface::direct_method(symbols::structures::equal_operator, __equal), CXX::Interface::direct_method(symbols::structures::not_operator, __not), CXX::Interface::direct_method(symbols::structures::bitwise_not_operator, __bitwise_not), CXX::Interface::direct_method(symbols::structures::convert::to_string, __to_string), CXX::Interface::direct_method(symbols::structures::convert::to_ui8, __to_ui8), CXX::Interface::direct_method(symbols::structures::convert::to_ui16, __to_ui16), CXX::Interface::direct_method(symbols::structures::convert::to_ui32, __to_ui32), CXX::Interface::direct_method(symbols::structures::convert::to_ui64, __to_ui64), CXX::Interface::direct_method(symbols::structures::convert::to_i8, __to_i8), CXX::Interface::direct_method(symbols::structures::convert::to_i16, __to_i16), CXX::Interface::direct_method(symbols::structures::convert::to_i32, __to_i32), CXX::Interface::direct_method(symbols::structures::convert::to_i64, __to_i64), CXX::Interface::direct_method(symbols::structures::convert::to_float, __to_float), CXX::Interface::direct_method(symbols::structures::convert::to_double, __to_double), CXX::Interface::direct_method(symbols::structures::convert::to_boolean, __to_boolean), CXX::Interface::direct_method(symbols::structures::convert::to_timepoint, __to_timepoint), CXX::Interface::direct_method(symbols::structures::convert::to_type_identifier, __to_type_identifier), CXX::Interface::direct_method("get", __get), CXX::Interface::direct_method("set", __set));
                     }
                     CXX::Interface::typeVTable<AtomicBasic<T>>() = virtual_table;
+                    virtual_table->getAfterMethods()->constructor = new FuncEnvironment(constructor);
+                    attacha_environment::get_types_global().join_namespace({"parallel", "atomic", type_name})->value = virtual_table;
                 }
             };
 
@@ -2047,7 +2120,7 @@ namespace art {
 
                 static void init() {
                     virtual_table = CXX::Interface::createTable<AtomicObject>(
-                        "AtomicAny",
+                        "atomic_any",
                         CXX::Interface::direct_method(symbols::structures::add_operator, __add),
                         CXX::Interface::direct_method(symbols::structures::subtract_operator, __sub),
                         CXX::Interface::direct_method(symbols::structures::multiply_operator, __mul),
@@ -2108,6 +2181,9 @@ namespace art {
                         CXX::Interface::direct_method("get", __get),
                         CXX::Interface::direct_method("set", __set)
                     );
+                    CXX::Interface::typeVTable<art::shared_ptr<art::mutex>>() = define_mutex;
+                    define_mutex->getAfterMethods()->constructor = new FuncEnvironment(atomic::constructor::createProxy_Any);
+                    attacha_environment::get_types_global().join_namespace({"parallel", "atomic", "atomic_any"}) -> value = virtual_table;
                 }
             };
 
@@ -2197,66 +2273,66 @@ namespace art {
 
 #pragma region define_rw_mutex
             AttachAFun(funs_rw_mutex_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 self->lock();
             });
             AttachAFun(funs_rw_mutex_unlock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 self->unlock();
             });
             AttachAFun(funs_rw_mutex_try_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 return self->try_lock();
             });
             AttachAFun(funs_rw_mutex_lock_shared, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 self->lock_shared();
             });
             AttachAFun(funs_rw_mutex_unlock_shared, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 self->unlock_shared();
             });
             AttachAFun(funs_rw_mutex_try_lock_shared, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::rw_mutex>>(args[0], define_rw_mutex);
                 self->try_lock_shared();
             });
 #pragma endregion
 
 #pragma region define_timed_mutex
             AttachAFun(funs_timed_mutex_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_timed_mutex);
                 self->lock();
             });
             AttachAFun(funs_timed_mutex_unlock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_timed_mutex);
                 self->unlock();
             });
             AttachAFun(funs_timed_mutex_try_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_timed_mutex);
                 return self->try_lock();
             });
 
             AttachAFun(funs_timed_mutex_try_lock_for, 2, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_timed_mutex);
                 return self->try_lock_for((std::chrono::milliseconds)(uint64_t)args[1]);
             });
             AttachAFun(funs_timed_mutex_try_lock_until, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::timed_mutex>>(args[0], define_timed_mutex);
                 return self->try_lock_until((std::chrono::high_resolution_clock::time_point)args[1]);
             });
 #pragma endregion
 
 #pragma region define_recursive_mutex
             AttachAFun(funs_recursive_mutex_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_recursive_mutex);
                 self->lock();
             });
             AttachAFun(funs_recursive_mutex_unlock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_recursive_mutex);
                 self->unlock();
             });
             AttachAFun(funs_recursive_mutex_try_lock, 1, {
-                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_mutex);
+                auto& self = CXX::Interface::getExtractAs<art::shared_ptr<art::recursive_mutex>>(args[0], define_recursive_mutex);
                 return self->try_lock();
             });
 #pragma endregion
@@ -2578,6 +2654,9 @@ namespace art {
                     CXX::Interface::direct_method("try_lock", funs_mutex_try_lock)
                 );
                 CXX::Interface::typeVTable<art::shared_ptr<art::mutex>>() = define_mutex;
+                define_mutex->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::createProxy_mutex);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "mutex"})->value = define_mutex;
+
 
                 define_rw_mutex = CXX::Interface::createTable<art::shared_ptr<art::rw_mutex>>(
                     "native_rw_mutex",
@@ -2589,6 +2668,8 @@ namespace art {
                     CXX::Interface::direct_method("try_lock_shared", funs_rw_mutex_try_lock_shared)
                 );
                 CXX::Interface::typeVTable<art::shared_ptr<art::rw_mutex>>() = define_rw_mutex;
+                define_rw_mutex->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::createProxy_rw_mutex);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "rw_mutex"})->value = define_rw_mutex;
 
                 define_timed_mutex = CXX::Interface::createTable<art::shared_ptr<art::timed_mutex>>(
                     "native_timed_mutex",
@@ -2599,6 +2680,8 @@ namespace art {
                     CXX::Interface::direct_method("try_lock_until", funs_timed_mutex_try_lock_until)
                 );
                 CXX::Interface::typeVTable<art::shared_ptr<art::timed_mutex>>() = define_timed_mutex;
+                define_timed_mutex->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::createProxy_timed_mutex);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "timed_mutex"})->value = define_timed_mutex;
 
                 define_recursive_mutex = CXX::Interface::createTable<art::shared_ptr<art::recursive_mutex>>(
                     "native_recursive_mutex",
@@ -2607,6 +2690,8 @@ namespace art {
                     CXX::Interface::direct_method("try_lock", funs_recursive_mutex_try_lock)
                 );
                 CXX::Interface::typeVTable<art::shared_ptr<art::recursive_mutex>>() = define_recursive_mutex;
+                define_recursive_mutex->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::createProxy_recursive_mutex);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "recursive_mutex"})->value = define_recursive_mutex;
 
 
                 define_condition_variable = CXX::Interface::createTable<art::shared_ptr<art::condition_variable_any>>(
@@ -2617,6 +2702,23 @@ namespace art {
                     CXX::Interface::direct_method("notify_all", funs_condition_variable_notify_all)
                 );
                 CXX::Interface::typeVTable<art::shared_ptr<art::condition_variable_any>>() = define_condition_variable;
+                define_condition_variable->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::createProxy_condition_variable);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "condition_variable"})->value = define_condition_variable;
+
+
+                define_thread = CXX::Interface::createTable<art::shared_ptr<Thread>>(
+                    "thread",
+                    CXX::Interface::direct_method("wait", funcs_Thread_wait),
+                    CXX::Interface::direct_method("wait_for", funcs_Thread_wait_for),
+                    CXX::Interface::direct_method("wait_until", funcs_Thread_wait_until),
+                    CXX::Interface::direct_method("waitable", funcs_Thread_waitable),
+                    CXX::Interface::direct_method("id", funcs_Thread_id),
+                    CXX::Interface::direct_method("get_name", funcs_Thread_get_name),
+                    CXX::Interface::direct_method("set_name", funcs_Thread_set_name)
+                );
+                CXX::Interface::typeVTable<art::shared_ptr<art::condition_variable_any>>() = define_thread;
+                define_thread->getAfterMethods()->constructor = new FuncEnvironment(native::constructor::construct_Thread);
+                attacha_environment::get_types_global().join_namespace({"parallel", "native", "thread"})->value = define_thread;
             }
         }
 
@@ -2635,19 +2737,19 @@ namespace art {
             init_GeneratorResultIterator();
             init_Generator();
             atomic::AtomicObject::init();
-            atomic::AtomicBasic<bool>::init();
-            atomic::AtomicBasic<int8_t>::init();
-            atomic::AtomicBasic<int16_t>::init();
-            atomic::AtomicBasic<int32_t>::init();
-            atomic::AtomicBasic<int64_t>::init();
-            atomic::AtomicBasic<uint8_t>::init();
-            atomic::AtomicBasic<uint16_t>::init();
-            atomic::AtomicBasic<uint32_t>::init();
-            atomic::AtomicBasic<uint64_t>::init();
-            atomic::AtomicBasic<float>::init();
-            atomic::AtomicBasic<double>::init();
+            atomic::AtomicBasic<bool>::init(atomic::constructor::createProxy_Bool);
+            atomic::AtomicBasic<int8_t>::init(atomic::constructor::createProxy_I8);
+            atomic::AtomicBasic<int16_t>::init(atomic::constructor::createProxy_I16);
+            atomic::AtomicBasic<int32_t>::init(atomic::constructor::createProxy_I32);
+            atomic::AtomicBasic<int64_t>::init(atomic::constructor::createProxy_I64);
+            atomic::AtomicBasic<uint8_t>::init(atomic::constructor::createProxy_UI8);
+            atomic::AtomicBasic<uint16_t>::init(atomic::constructor::createProxy_UI16);
+            atomic::AtomicBasic<uint32_t>::init(atomic::constructor::createProxy_UI32);
+            atomic::AtomicBasic<uint64_t>::init(atomic::constructor::createProxy_UI64);
+            atomic::AtomicBasic<float>::init(atomic::constructor::createProxy_Float);
+            atomic::AtomicBasic<double>::init(atomic::constructor::createProxy_Double);
             if constexpr (!std::is_same_v<size_t, uint64_t> || !std::is_same_v<size_t, uint32_t>)
-                atomic::AtomicBasic<size_t>::init();
+                atomic::AtomicBasic<size_t>::init(atomic::constructor::createProxy_UndefinedPtr);
             native::init();
         }
     }

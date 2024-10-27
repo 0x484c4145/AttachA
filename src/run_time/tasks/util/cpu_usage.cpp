@@ -21,7 +21,8 @@ static double calculate_cpu_load(art::cpu::usage_prev_stat& prev_stat, uint64_t 
     return result;
 }
 #if PLATFORM_WINDOWS
-#include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 
 namespace art {
     namespace cpu {

@@ -2,6 +2,7 @@
 #include <run_time/library/localization.hpp>
 
 #if PLATFORM_WINDOWS
+    #define NOMINMAX
     #include <Windows.h>
 #elif PLATFORM_LINUX
     #include <locale.h>
@@ -34,7 +35,7 @@ namespace art {
         });
 
         AttachAFun(get_languages_list, 0, {
-            return _internal_::get_languages_list().convert<ValueItem>([](const art::ustring& language) { return language; });
+            return _internal_::get_languages_list().convert<ValueItem>([](const art::ustring& language) -> ValueItem { return language; });
         });
 
         AttachAFun(get_localized_string, 1, {

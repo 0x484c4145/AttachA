@@ -43,6 +43,7 @@ FILE(GLOB SRCFILES
         src/util/*.cpp
         src/library/*.cpp
         src/base/*.cpp 
+        src/base/*/*.cpp 
 )
 FILE(GLOB LIB_SRCFILES 
         src/asm.asm 

@@ -6,6 +6,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #ifdef _WIN64
+    #define NOMINMAX
     #include <Windows.h>
 #endif
 #include <cstdio>
@@ -57,6 +58,7 @@ namespace art {
 #else
         constexpr bool is_loaded = true;
 #endif
+
         enum class RW_CONS : bool {
             R,
             W

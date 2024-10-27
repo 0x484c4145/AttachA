@@ -5,6 +5,7 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #include <run_time/AttachA_CXX.hpp>
+#include <run_time/asm/attacha_environment.hpp>
 #include <run_time/library/bytes.hpp>
 #include <run_time/library/cxx/files.hpp>
 #include <run_time/library/file.hpp>
@@ -866,14 +867,14 @@ namespace art {
 #pragma region FileBrowser
         AttachAFun(funs_FolderBrowser_folders, 1, {
             auto& handle = CXX::Interface::getExtractAs<typed_lgr<files::FolderBrowser>>(args[0], define_FolderBrowser);
-            return handle->folders().convert_take<ValueItem>([](art::ustring&& str) {
+            return handle->folders().convert_take<ValueItem>([](art::ustring&& str) -> ValueItem {
                 return std::move(str);
             });
         });
 
         AttachAFun(funs_FolderBrowser_files, 1, {
             auto& handle = CXX::Interface::getExtractAs<typed_lgr<files::FolderBrowser>>(args[0], define_FolderBrowser);
-            return handle->files().convert_take<ValueItem>([](art::ustring&& str) {
+            return handle->files().convert_take<ValueItem>([](art::ustring&& str) -> ValueItem {
                 return std::move(str);
             });
         });
@@ -1162,6 +1163,18 @@ namespace art {
             CXX::Interface::typeVTable<typed_lgr<files::BlockingFileHandle>>() = define_BlockingFileHandle;
             CXX::Interface::typeVTable<typed_lgr<TextFile>>() = define_TextFile;
             CXX::Interface::typeVTable<typed_lgr<files::FolderBrowser>>() = define_FolderBrowser;
+
+
+            define_FileHandle->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_FileHandle);
+            define_BlockingFileHandle->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_BlockingFileHandle);
+            define_TextFile->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_TextFile);
+            define_FolderBrowser->getAfterMethods()->constructor = new FuncEnvironment(constructor::createProxy_FolderBrowser);
+
+
+            attacha_environment::get_types_global().join_namespace({"file", "file_handle"})->value = define_FileHandle;
+            attacha_environment::get_types_global().join_namespace({"file", "blocking_file_handle"})->value = define_BlockingFileHandle;
+            attacha_environment::get_types_global().join_namespace({"file", "text_file"})->value = define_TextFile;
+            attacha_environment::get_types_global().join_namespace({"file", "folder_browser"})->value = define_FolderBrowser;
         }
     }
 }

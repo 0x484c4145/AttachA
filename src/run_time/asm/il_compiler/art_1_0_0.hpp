@@ -86,7 +86,13 @@ namespace art {
                 copy_un_constant,
                 copy_un_reference,
                 move_un_reference,
-                remove_qualifiers
+                remove_qualifiers,
+
+                global_get,
+                global_set,
+
+                map_op,
+                set_op,
             );
 
 
@@ -122,6 +128,27 @@ namespace art {
                 decommit,
                 remove_reserved,
                 size
+            );
+
+            ENUM_t(
+                OpcodeMap,
+                uint8_t,
+                set,
+                get,
+                contains,
+                remove_item,
+                reserve,
+                size,
+            );
+
+            ENUM_t(
+                OpcodeSet,
+                uint8_t,
+                set,
+                contains,
+                remove_item,
+                reserve,
+                size,
             );
 
             ENUM_t(
@@ -215,12 +242,15 @@ namespace art {
                     size_t end_offset,
                     CASM& casm_assembler,
                     list_array<std::pair<uint64_t, Label>>& jump_list,
+                    list_array<art::line_info>& line_info,
+                    std::string& file_local_path,
                     std::vector<art::shared_ptr<FuncEnvironment>>& locals,
                     FunctionMetaFlags& flags,
                     uint16_t& used_static_values,
                     uint16_t& used_enviro_vals,
                     uint32_t& used_arguments,
-                    uint64_t& constants_values) override;
+                    uint64_t& constants_values
+                ) override;
             };
         }
     }

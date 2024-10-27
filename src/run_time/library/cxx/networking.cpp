@@ -4,10 +4,12 @@
 // (See accompanying file LICENSE or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
+#include <run_time/asm/attacha_environment.hpp>
 #include <util/platform.hpp>
 #if PLATFORM_WINDOWS
     #define _WINSOCKAPI_
     #define WIN32_LEAN_AND_MEAN
+    #define NOMINMAX
     #include <winsock2.h>
 
     #include <ws2tcpip.h>
@@ -33,7 +35,7 @@
 #include <run_time/library/cxx/networking.hpp>
 #include <run_time/tasks/util/native_workers_singleton.hpp>
 #include <utf8cpp/utf8.h>
-
+#include <run_time/library/net.hpp>
 namespace art {
     AttachAVirtualTable* define_UniversalAddress = nullptr;
     AttachAVirtualTable* define_TcpConfiguration = nullptr;
@@ -258,12 +260,14 @@ namespace art {
             CXX::Interface::direct_method("full_address", UniversalAddress::_define_full_address)
         );
         CXX::Interface::typeVTable<universal_address>() = define_UniversalAddress;
+        define_UniversalAddress->getAfterMethods()->constructor = new FuncEnvironment(net::constructor::createProxy_Address);
+        attacha_environment::get_types_global().join_namespace({"nat", "universal_address"})->value = define_UniversalAddress;
     }
 
     void init_define_TcpConfiguration() {
-        if (define_UniversalAddress != nullptr)
+        if (define_TcpConfiguration != nullptr)
             return;
-        define_UniversalAddress = CXX::Interface::createTable<TcpConfiguration>(
+        define_TcpConfiguration = CXX::Interface::createTable<TcpConfiguration>(
             "tcp_configuration",
             CXX::Interface::direct_method("get_recv_timeout_ms", TcpConfiguration_map::_define_get_recv_timeout_ms),
             CXX::Interface::direct_method("get_send_timeout_ms", TcpConfiguration_map::_define_get_send_timeout_ms),
@@ -292,7 +296,9 @@ namespace art {
             CXX::Interface::direct_method("set_keep_alive_retry_count", TcpConfiguration_map::_define_set_keep_alive_retry_count),
             CXX::Interface::direct_method("set_keep_alive_user_timeout_ms", TcpConfiguration_map::_define_set_keep_alive_user_timeout_ms)
         );
-        CXX::Interface::typeVTable<TcpConfiguration>() = define_UniversalAddress;
+        CXX::Interface::typeVTable<TcpConfiguration>() = define_TcpConfiguration;
+        define_TcpConfiguration->getAfterMethods()->constructor = new FuncEnvironment(net::constructor::createProxy_TcpConfiguration);
+        attacha_environment::get_types_global().join_namespace({"nat", "tcp_configuration"})->value = define_TcpConfiguration;
     }
 
     void internal_makeIP4(universal_address& addr_storage, const char* ip, uint16_t port) {
@@ -457,7 +463,8 @@ namespace art {
             WRITE,
             TRANSMIT_FILE,
             INTERNAL_READ,
-            INTERNAL_CLOSE
+            INTERNAL_CLOSE,
+            FINISH
         } opcode = Opcode::ACCEPT;
 
         tcp_handle(SOCKET socket, int32_t buffer_len, NativeWorkerManager* manager, uint32_t read_queue_size = 10)
@@ -721,6 +728,7 @@ namespace art {
             default:
                 break;
             }
+            opcode = Opcode::FINISH;
         }
 
         void send_and_close(const char* data, int len) {
@@ -856,6 +864,8 @@ namespace art {
             art::unique_lock<MutexUnify> lock(mutex);
             std::list<std::tuple<char*, size_t>> clear_write_queue;
             std::list<std::tuple<char*, size_t>> clear_read_queue;
+            if (opcode != Opcode::FINISH && opcode != Opcode::ACCEPT)
+                cv.wait(lock);
             readed_bytes = 0;
             sent_bytes = 0;
             delete[] data;
@@ -945,7 +955,7 @@ namespace art {
             overlapped.Offset = offset & 0xFFFFFFFF;
             overlapped.OffsetHigh = offset >> 32;
             opcode = Opcode::TRANSMIT_FILE;
-            bool res = _TransmitFile(sock, FILE, block, chunks_size, &overlapped, NULL, TF_USE_KERNEL_APC);
+            bool res = _TransmitFile(sock, FILE, block, chunks_size, &overlapped, NULL, TF_USE_KERNEL_APC | TF_WRITE_BEHIND);
             if (!res && WSAGetLastError() != WSA_IO_PENDING)
                 res = false;
             cv.wait(lock);
@@ -1252,6 +1262,7 @@ namespace art {
             CXX::Interface::direct_method("remote_address", funs_TcpNetworkStream_remote_address)
         );
         CXX::Interface::typeVTable<TcpNetworkStream>() = define_TcpNetworkStream;
+        attacha_environment::get_types_global().join_namespace({"nat", "tcp_network_stream"})->value = define_TcpNetworkStream;
     }
 
     #pragma endregion
@@ -1497,6 +1508,7 @@ namespace art {
             CXX::Interface::direct_method("remote_address", funs_TcpNetworkBlocking_remote_address)
         );
         CXX::Interface::typeVTable<TcpNetworkBlocking>() = define_TcpNetworkBlocking;
+        attacha_environment::get_types_global().join_namespace({"nat", "tcp_network_blocking"})->value = define_TcpNetworkBlocking;
     }
 
     #pragma endregion
@@ -1942,7 +1954,15 @@ namespace art {
         bool corrupted = false;
 
         void set_configuration(SOCKET sock, const TcpConfiguration& config) {
-            int cfg = !config.enable_timestamps;
+            int cfg = !config.allow_ip4;
+
+            if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&cfg, sizeof(cfg)) == -1) {
+                ValueItem error = art::ustring("Failed set timestamps mode: ") + std::to_string(errno);
+                errors.sync_notify(error);
+                corrupted = true;
+                return;
+            }
+            cfg = !config.enable_timestamps;
             if (setsockopt(sock, IPPROTO_TCP, TCP_TIMESTAMPS, (char*)&cfg, sizeof(cfg)) == -1) {
                 ValueItem error = art::ustring("Failed set timestamps mode: ") + std::to_string(errno);
                 errors.sync_notify(error);
@@ -3185,6 +3205,7 @@ namespace art {
             CXX::Interface::direct_method("remote_address", funs_TcpNetworkStream_remote_address)
         );
         CXX::Interface::typeVTable<TcpNetworkStream>() = define_TcpNetworkStream;
+        attacha_environment::get_types_global().join_namespace({"nat", "tcp_network_stream"})->value = define_TcpNetworkStream;
     }
 
     #pragma endregion
@@ -3430,6 +3451,7 @@ namespace art {
             CXX::Interface::direct_method("remote_address", funs_TcpNetworkBlocking_remote_address)
         );
         CXX::Interface::typeVTable<TcpNetworkBlocking>() = define_TcpNetworkBlocking;
+        attacha_environment::get_types_global().join_namespace({"nat", "tcp_network_blocking"})->value = define_TcpNetworkBlocking;
     }
 
     #pragma endregion

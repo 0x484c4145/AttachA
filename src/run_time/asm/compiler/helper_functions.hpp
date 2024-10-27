@@ -9,13 +9,17 @@
 #include <run_time/attacha_abi.hpp>
 #include <util/exceptions.hpp>
 
+#include <run_time/asm/CASM.hpp>
 
 namespace art {
     namespace helper_functions {
-        inline void setSize(void** value, size_t res) {
-            void*& set = getValue(*value, *(ValueMeta*)(value + 1));
-            ValueMeta& meta = *(ValueMeta*)(value + 1);
-            switch (meta.vtype) {
+        namespace intrinsics {
+            void store_bool_from_resr(CASM& a);
+        }
+
+        inline void setSize(ValueItem* value, size_t res) {
+            void*& set = value->getSourcePtr();
+            switch (value->meta.vtype) {
             case VType::i8:
                 if (((int8_t&)set = (int8_t)res) != res)
                     throw NumericUndererflowException();
@@ -60,140 +64,235 @@ namespace art {
             }
         }
 
+        inline void IndexMapGetCopyStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            *value = arr[*pos];
+        }
+
+        inline void IndexMapGetMoveStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            *value = std::move(arr[*pos]);
+        }
+
+        inline void IndexMapSetCopyStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr[*pos] = *value;
+        }
+
+        inline void IndexMapSetMoveStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr[*pos] = std::move(*value);
+        }
+
+        inline bool IndexMapContainsStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            return arr.contains(*pos);
+        }
+
+        inline void IndexMapRemoveStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.erase(*pos);
+        }
+
+        inline void IndexMapReserveStatic(void** arr_ref, ValueItem* count) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.reserve((size_t)*count);
+        }
+
+        inline void IndexMapSizeStatic(ValueItem* size, void** arr_ref) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            setSize(size, arr.size());
+        }
+
+        inline void IndexMapGetCopyStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            *value = arr[*pos];
+        }
+
+        inline void IndexMapGetMoveStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            *value = std::move(arr[*pos]);
+        }
+
+        inline void IndexMapSetCopyStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr[*pos] = *value;
+        }
+
+        inline void IndexMapSetMoveStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr[*pos] = std::move(*value);
+        }
+
+        inline bool IndexMapContainsStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            return arr.contains(*pos);
+        }
+
+        inline void IndexMapRemoveStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.erase(*pos);
+        }
+
+        inline void IndexMapReserveStatic(void** arr_ref, ValueItem* count) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.reserve((size_t)*count);
+        }
+
+        inline void IndexMapSizeStatic(ValueItem* size, void** arr_ref) {
+            std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_map<ValueItem, ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            setSize(size, arr.size());
+        }
+
+        inline void IndexSetSetCopyStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.insert(*value);
+        }
+
+        inline void IndexSetSetMoveStatic(ValueItem* value, void** arr_ref, ValueItem* pos) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.insert(std::move(*value));
+        }
+
+        inline bool IndexSetContainsStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            return arr.contains(*pos);
+        }
+
+        inline void IndexSetRemoveStatic(void** arr_ref, ValueItem* pos) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.erase(*pos);
+        }
+
+        inline void IndexSetReserveStatic(void** arr_ref, ValueItem* count) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            arr.reserve((size_t)*count);
+        }
+
+        inline void IndexSetSizeStatic(ValueItem* size, void** arr_ref) {
+            std::unordered_set<ValueItem, art::hash<ValueItem>>& arr = *(std::unordered_set<ValueItem, art::hash<ValueItem>>*)getValue(*arr_ref, ((ValueMeta*)arr_ref)[1]);
+            setSize(size, arr.size());
+        }
 
         template <char typ>
-        inline void IndexArrayCopyStatic(void** value, list_array<ValueItem>** arr_ref, uint64_t pos) {
-            universalRemove(value);
-            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
-            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, meta);
+        inline void IndexArrayMoveStatic(ValueItem* value, list_array<ValueItem>** arr_ref, uint64_t pos) {
+            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, ((ValueMeta*)arr_ref)[1]);
             if constexpr (typ == 2) {
-                if (arr->size() > pos) {
-                    ValueItem temp = ((list_array<ValueItem>*)arr)->atDefault(pos);
-                    *value = temp.val;
-                    *((size_t*)(value + 1)) = temp.meta.encoded;
-                    temp.val = nullptr;
-                } else {
+                if (arr->size() > pos)
+                    *value = std::move(((list_array<ValueItem>*)arr)->at_default(pos));
+                else
                     *value = nullptr;
-                    *((size_t*)(value + 1)) = 0;
-                }
             } else {
                 ValueItem* res;
                 if constexpr (typ == 1)
                     res = &((list_array<ValueItem>*)arr)->at(pos);
                 else
                     res = &((list_array<ValueItem>*)arr)->operator[](pos);
-                *value = copyValue(res->val, res->meta);
-                *((size_t*)(value + 1)) = res->meta.encoded;
+                *value = std::move(*res);
             }
         }
+
         template <char typ>
-        inline void IndexArrayMoveStatic(void** value, list_array<ValueItem>** arr_ref, uint64_t pos) {
-            universalRemove(value);
-            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
-            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, meta);
+        inline void IndexArrayCopyStatic(ValueItem* value, list_array<ValueItem>** arr_ref, uint64_t pos) {
+            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, ((ValueMeta*)arr_ref)[1]);
             if constexpr (typ == 2) {
-                if (arr->size() > pos) {
-                    ValueItem& res = ((list_array<ValueItem>*)arr)->operator[](pos);
-                    *value = res.val;
-                    *((size_t*)(value + 1)) = res.meta.encoded;
-                    res.val = nullptr;
-                    res.meta.encoded = 0;
-                } else {
+                if (arr->size() > pos)
+                    *value = ((list_array<ValueItem>*)arr)->at_default(pos);
+                else
                     *value = nullptr;
-                    *((size_t*)(value + 1)) = 0;
-                }
             } else {
                 ValueItem* res;
                 if constexpr (typ == 1)
                     res = &((list_array<ValueItem>*)arr)->at(pos);
                 else
                     res = &((list_array<ValueItem>*)arr)->operator[](pos);
-                *value = res->val;
-                *((size_t*)(value + 1)) = res->meta.encoded;
-                res->val = nullptr;
-                res->meta.encoded = 0;
+                *value = *res;
             }
         }
 
+        template <char typ>
+        inline void IndexArrayMoveStatic(ValueItem* value, list_array<ValueItem>** arr_ref, uint64_t pos) {
+            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, ((ValueMeta*)arr_ref)[1]);
+            if constexpr (typ == 2) {
+                if (arr->size() > pos)
+                    *value = std::move(((list_array<ValueItem>*)arr)->operator[](pos));
+                else
+                    *value = nullptr;
+            } else {
+                ValueItem* res;
+                if constexpr (typ == 1)
+                    res = &((list_array<ValueItem>*)arr)->at(pos);
+                else
+                    res = &((list_array<ValueItem>*)arr)->operator[](pos);
+                *value = std::move(*res);
+            }
+        }
 
         template <char typ>
-        void IndexArraySetCopyStatic(void** value, list_array<ValueItem>** arr_ref, uint64_t pos) {
-            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
-            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, meta);
+        void IndexArraySetCopyStatic(ValueItem* value, list_array<ValueItem>** arr_ref, uint64_t pos) {
+            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, ((ValueMeta*)arr_ref)[1]);
             if constexpr (typ == 2) {
                 if (((list_array<ValueItem>*)arr)->size() <= pos)
                     ((list_array<ValueItem>*)arr)->resize(pos + 1);
-                ((list_array<ValueItem>*)arr)->operator[](pos) = reinterpret_cast<ValueItem&>(value);
+                ((list_array<ValueItem>*)arr)->operator[](pos) = *value;
             } else {
                 if constexpr (typ == 1)
-                    ((list_array<ValueItem>*)arr)->at(pos) = reinterpret_cast<ValueItem&>(value);
+                    ((list_array<ValueItem>*)arr)->at(pos) = *value;
                 else
-                    ((list_array<ValueItem>*)arr)->operator[](pos) = reinterpret_cast<ValueItem&>(value);
-            }
-        }
-        template <char typ>
-        void IndexArraySetMoveStatic(void** value, list_array<ValueItem>** arr_ref, uint64_t pos) {
-            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
-            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, meta);
-            if constexpr (typ == 2) {
-                if (((list_array<ValueItem>*)arr)->size() <= pos)
-                    ((list_array<ValueItem>*)arr)->resize(pos + 1);
-                ((list_array<ValueItem>*)arr)->operator[](pos) = reinterpret_cast<ValueItem&&>(value);
-            } else {
-                if constexpr (typ == 1)
-                    ((list_array<ValueItem>*)arr)->at(pos) = reinterpret_cast<ValueItem&&>(value);
-                else
-                    ((list_array<ValueItem>*)arr)->operator[](pos) = reinterpret_cast<ValueItem&&>(value);
+                    ((list_array<ValueItem>*)arr)->operator[](pos) = *value;
             }
         }
 
+        template <char typ>
+        void IndexArraySetMoveStatic(ValueItem* value, list_array<ValueItem>** arr_ref, uint64_t pos) {
+            list_array<ValueItem>* arr = (list_array<ValueItem>*)getValue(*(void**)arr_ref, ((ValueMeta*)arr_ref)[1]);
+            if constexpr (typ == 2) {
+                if (((list_array<ValueItem>*)arr)->size() <= pos)
+                    ((list_array<ValueItem>*)arr)->resize(pos + 1);
+                ((list_array<ValueItem>*)arr)->operator[](pos) = std::move(*value);
+            } else {
+                if constexpr (typ == 1)
+                    ((list_array<ValueItem>*)arr)->at(pos) = std::move(*value);
+                else
+                    ((list_array<ValueItem>*)arr)->operator[](pos) = std::move(*value);
+            }
+        }
 
         template <char typ, class T>
-        void IndexArrayCopyStatic(void** value, void** arr_ref, uint64_t pos) {
-            universalRemove(value);
+        void IndexArrayCopyStatic(ValueItem* value, void** arr_ref, uint64_t pos) {
             ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
             T* arr = (T*)getValue(*arr_ref, meta);
             if constexpr (typ == 2) {
                 if (meta.val_len <= pos) {
                     *value = nullptr;
-                    *((size_t*)(value + 1)) = 0;
+                    return;
+                }
+            } else if constexpr (typ == 1)
+                if (meta.val_len > pos)
+                    throw OutOfRange();
+            *value = arr[pos];
+        }
+
+        template <char typ, class T>
+        void IndexArrayMoveStatic(ValueItem* value, void** arr_ref, uint64_t pos) {
+            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
+            T* arr = (T*)getValue(*arr_ref, meta);
+            if constexpr (typ == 2) {
+                if (meta.val_len <= pos) {
+                    *value = nullptr;
                     return;
                 }
             } else if constexpr (typ == 1)
                 if (meta.val_len > pos)
                     throw OutOfRange();
 
-            ValueItem temp = arr[pos];
-            *value = temp.val;
-            *((size_t*)(value + 1)) = temp.meta.encoded;
-            temp.val = nullptr;
-        }
-        template <char typ, class T>
-        void IndexArrayMoveStatic(void** value, void** arr_ref, uint64_t pos) {
-            universalRemove(value);
-            ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
-            T* arr = (T*)getValue(*arr_ref, meta);
-            if constexpr (typ == 2) {
-                if (meta.val_len <= pos) {
-                    *value = nullptr;
-                    *((size_t*)(value + 1)) = 0;
-                    return;
-                }
-            } else if constexpr (typ == 1)
-                if (meta.val_len > pos)
-                    throw OutOfRange();
-
-            ValueItem temp = std::move(arr[pos]);
+            *value = std::move(arr[pos]);
             if (!std::is_same_v<T, ValueItem>)
                 arr[pos] = T();
-            *value = temp.val;
-            *((size_t*)(value + 1)) = temp.meta.encoded;
-            temp.val = nullptr;
         }
 
-
         template <char typ, class T>
-        void IndexArraySetCopyStatic(void** value, void** arr_ref, uint32_t pos) {
+        void IndexArraySetCopyStatic(ValueItem* value, void** arr_ref, uint32_t pos) {
             ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
             T* arr = (T*)getValue(*arr_ref, meta);
             if constexpr (typ != 0) {
@@ -201,55 +300,46 @@ namespace art {
                     throw OutOfRange();
             }
             if constexpr (std::is_same_v<T, ValueItem>)
-                arr[pos] = *reinterpret_cast<ValueItem*>(value);
+                arr[pos] = *value;
             else
-                arr[pos] = (T) * reinterpret_cast<ValueItem*>(value);
+                arr[pos] = (T)*value;
         }
+
         template <char typ, class T>
-        void IndexArraySetMoveStatic(void** value, void** arr_ref, uint32_t pos) {
+        void IndexArraySetMoveStatic(ValueItem* value, void** arr_ref, uint32_t pos) {
             ValueMeta& meta = ((ValueMeta*)arr_ref)[1];
             T* arr = (T*)getValue(*arr_ref, meta);
             if constexpr (typ != 0) {
                 if (meta.val_len <= pos)
                     throw OutOfRange();
             }
-            arr[pos] = (T) reinterpret_cast<ValueItem&&>(value);
+            arr[pos] = (T)std::move(*value);
             if (!std::is_same_v<T, ValueItem>)
-                reinterpret_cast<ValueItem&>(value) = ValueItem();
+                *value = ValueItem();
         }
 
-
         template <char typ>
-        void IndexArrayStaticInterface(void** value, ValueItem* arr_ref, uint64_t pos) noexcept(false) {
-            universalRemove(value);
+        void IndexArrayStaticInterface(ValueItem* value, ValueItem* arr_ref, uint64_t pos) noexcept(false) {
             size_t length = (size_t)CXX::Interface::makeCall(ClassAccess::pub, *arr_ref, symbols::structures::size);
             if constexpr (typ == 2) {
                 if (length <= pos) {
                     *value = nullptr;
-                    *((size_t*)(value + 1)) = 0;
                     return;
                 }
             } else if constexpr (typ == 1)
                 if (length > pos)
                     throw OutOfRange();
-            ValueItem temp =
-                CXX::Interface::makeCall(ClassAccess::pub, *arr_ref, symbols::structures::index_operator, pos);
-            *value = temp.val;
-            *((size_t*)(value + 1)) = temp.meta.encoded;
-            temp.val = nullptr;
+            *value = CXX::Interface::makeCall(ClassAccess::pub, *arr_ref, symbols::structures::index_operator, pos);
         }
+
         template <char typ>
-        void IndexArraySetStaticInterface(void** value, ValueItem* arr_ref, uint64_t pos) {
+        void IndexArraySetStaticInterface(ValueItem* value, ValueItem* arr_ref, uint64_t pos) {
             size_t length = (size_t)CXX::Interface::makeCall(ClassAccess::pub, *arr_ref, symbols::structures::size);
             if constexpr (typ != 0) {
                 if (length <= pos)
                     throw OutOfRange();
             }
-            CXX::Interface::makeCall(ClassAccess::pub,
-                                     *arr_ref,
-                                     symbols::structures::index_set_operator,
-                                     pos,
-                                     reinterpret_cast<ValueItem&>(value));
+            CXX::Interface::makeCall(ClassAccess::pub, *arr_ref, symbols::structures::index_set_operator, pos, *value);
         }
 
         template <char typ>
@@ -299,6 +389,7 @@ namespace art {
                 throw InvalidIL("Invalid opcode, unsupported static type for this operation");
             }
         }
+
         template <char typ>
         void inlineIndexArraySetMoveStatic(BuildCall& b, VType type) {
             switch (type) {
@@ -391,6 +482,7 @@ namespace art {
                 throw InvalidIL("Invalid opcode, unsupported static type for this operation");
             }
         }
+
         template <char typ>
         void inlineIndexArrayMoveStatic(BuildCall& b, VType type) {
             switch (type) {
@@ -437,7 +529,7 @@ namespace art {
         }
 
         template <char typ>
-        void IndexArrayCopyDynamic(void** value, ValueItem* arr, uint64_t pos) {
+        void IndexArrayCopyDynamic(ValueItem* value, ValueItem* arr, uint64_t pos) {
             switch (arr->meta.vtype) {
             case VType::uarr:
                 IndexArrayCopyStatic<typ>(value, (list_array<ValueItem>**)arr, pos);
@@ -483,8 +575,9 @@ namespace art {
                 throw NotImplementedException();
             }
         }
+
         template <char typ>
-        void IndexArrayMoveDynamic(void** value, ValueItem* arr, uint64_t pos) {
+        void IndexArrayMoveDynamic(ValueItem* value, ValueItem* arr, uint64_t pos) {
             switch (arr->meta.vtype) {
             case VType::uarr:
                 IndexArrayMoveStatic<typ>(value, (list_array<ValueItem>**)arr, pos);
@@ -528,9 +621,8 @@ namespace art {
             }
         }
 
-
         template <char typ>
-        void IndexArraySetCopyDynamic(void** value, ValueItem* arr, uint64_t pos) {
+        void IndexArraySetCopyDynamic(ValueItem* value, ValueItem* arr, uint64_t pos) {
             switch (arr->meta.vtype) {
             case VType::uarr:
                 IndexArraySetCopyStatic<typ>(value, (list_array<ValueItem>**)arr, pos);
@@ -576,8 +668,9 @@ namespace art {
                 throw NotImplementedException();
             }
         }
+
         template <char typ>
-        void IndexArraySetMoveDynamic(void** value, ValueItem* arr, uint64_t pos) {
+        void IndexArraySetMoveDynamic(ValueItem* value, ValueItem* arr, uint64_t pos) {
             switch (arr->meta.vtype) {
             case VType::uarr:
                 IndexArraySetMoveStatic<typ>(value, (list_array<ValueItem>**)arr, pos);
@@ -620,6 +713,7 @@ namespace art {
                 throw NotImplementedException();
             }
         }
+
         inline void takeStart(list_array<ValueItem>* dest, void** insert) {
             reinterpret_cast<ValueItem&>(insert) = dest->take_front();
         }
@@ -630,8 +724,7 @@ namespace art {
             reinterpret_cast<ValueItem&>(insert) = dest->take(pos);
         }
         inline void getRange(list_array<ValueItem>* dest, void** insert, size_t start, size_t end) {
-            auto tmp = dest->range(start, end);
-            reinterpret_cast<ValueItem&>(insert) = list_array<ValueItem>(tmp.begin(), tmp.end());
+            reinterpret_cast<ValueItem&>(insert) = dest->copy(start, end);
         }
         inline void takeRange(list_array<ValueItem>* dest, void** insert, size_t start, size_t end) {
             reinterpret_cast<ValueItem&>(insert) = dest->take(start, end);

@@ -126,9 +126,9 @@ namespace art {
             own,             //direct call c++ ValueItem* func(ValueItem* args, uint32_t args_count)
             native_c,        //c abi calls with DynamicCall
             static_native_c, //c abi calls, but using c++ proxy template function
-            python,
-            csharp,
-            java,
+            python,//not implemented
+            csharp,//not implemented
+            java,//not implemented
             _,
             __,
             ___,
@@ -162,7 +162,7 @@ namespace art {
         FuncHandle* parent = nullptr;
         uint8_t* frame = nullptr;
         art::ustring* cross_code_compiler_name_version = nullptr;
-        std::atomic_size_t ref_count = 0;
+        volatile std::atomic_size_t ref_count = 0;
 
         FuncType _type : 4;
         bool is_cheap : 1;            //function without context switches and with fast code
@@ -191,7 +191,12 @@ namespace art {
         }
 
         void reduce_usage() {
-            if (ref_count.fetch_sub(1) == 1)
+            if (ref_count.load() == 0) {
+                if (parent)
+                    return;
+                else
+                    delete this;
+            } else if (ref_count.fetch_sub(1) == 1)
                 delete this;
         }
 

@@ -151,7 +151,7 @@ const char _FATAL[] = "FATAL";
 const char _ERROR[] = "ERROR";
 const char _WARN[] = "WARN";
 const char _INFO[] = "INFO";
-#include <run_time/ValueEnvironment.hpp>
+#include <run_time/values_global.hpp>
 
 int mmain() {
     unhandled_exception.join(new FuncEnvironment(logger<_FATAL>, false, false));
@@ -195,14 +195,19 @@ int mmain() {
 #include "run_time/library/cxx/networking.hpp"
 static constexpr char file_path[] = "D:\\sample_hello_world_http_response.txt";
 
+void tcp_network_read(TcpNetworkStream& stream) {
+    stream.read_available_ref();
+    while (stream.data_available())
+        stream.read_available_ref();
+}
+
 void test_slow_server_http(TcpNetworkStream& stream) {
     if (!stream.is_closed()) {
         files::FileHandle file(file_path, sizeof(file_path), files::open_mode::read, files::on_open_action::open, files::_async_flags{.sequential_scan = true});
         auto file_read = file.read((uint32_t)file.size());
-
-        while (stream.data_available())
-            stream.read_available_ref();
-        stream.write((array_t<char>)file_read);
+        tcp_network_read(stream);
+        auto rs = (array_t<char>)file_read;
+        stream.write(rs);
     }
 }
 
@@ -217,8 +222,7 @@ AttachAFunc(class_transfer_test, 1) {
 void test_fast_server_http(TcpNetworkStream& stream) {
     //CXX::cxxCall(class_transfer_test, stream);
     if (!stream.is_closed()) {
-        while (stream.data_available())
-            stream.read_available_ref();
+        tcp_network_read(stream);
         stream.write_file(file.internal_get_handle());
     }
 }
@@ -232,8 +236,8 @@ int ymain() {
     warning.join(CXX::MakeNative(logger<_WARN>, false, false));
     info.join(CXX::MakeNative(logger<_INFO>, false, false));
 
-    TcpNetworkServer server(CXX::MakeNative(test_slow_server_http, false, false), "0.0.0.0:1234", TcpNetworkServer::ManageType::write_delayed, 20);
-    TcpNetworkServer server2(CXX::MakeNative(test_fast_server_http, false, false), "0.0.0.0:1235", TcpNetworkServer::ManageType::write_delayed, 20);
+    TcpNetworkServer server(CXX::MakeNative(test_slow_server_http, false, false), "[::1]:1234", TcpNetworkServer::ManageType::write_delayed, 20);
+    TcpNetworkServer server2(CXX::MakeNative(test_fast_server_http, false, false), "[::1]:1235", TcpNetworkServer::ManageType::write_delayed, 20);
 
     server.start();
     server2.start();
@@ -294,7 +298,7 @@ int main() {
     art_lib::console::printf("  # []\n", results);
     art_lib::console::resetTextColor();
     art_lib::console::printLine("Sample execution end.");
-    //ymain();
+    ymain();
     Task::create_executor(4);
     auto itt = 100;
     art_lib::console::printf("Hello from main block! []\n", art::this_thread::get_id());

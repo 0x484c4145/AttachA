@@ -8,10 +8,10 @@
 #include <run_time/asm/attacha_environment.hpp>
 #include <util/platform.hpp>
 #ifdef PLATFORM_WINDOWS
-#include <Windows.h>
+    #define NOMINMAX
+    #include <Windows.h>
 
-#include <DbgHelp.h>
-#include <dbgeng.h>
+    #include <DbgHelp.h>
 
 namespace art {
     void _______dbgOut(const char* str) {
@@ -342,19 +342,6 @@ namespace art {
         return CaptureStackTrace___(max_frames, out_frames, context);
     }
 
-    size_t JITPCToLine(uint8_t* pc, const frame_info* info) {
-        //int PCIndex = int(pc - ((uint8_t*)(info->start)));
-        //if(info->LineInfo.Size() == 1) return info->LineInfo[0].LineNumber;
-        //for (unsigned i = 1; i < info->LineInfo.Size(); i++)
-        //{
-        //	if(info->LineInfo[i].InstructionIndex >= PCIndex)
-        //	{
-        //		return info->LineInfo[i - 1].LineNumber;
-        //	}
-        //}
-        return SIZE_MAX;
-    }
-
     template <typename Vec, typename T>
     void pushInVectorAsValue(std::vector<Vec>& vec, T value) {
         size_t _add = sizeof(T) / sizeof(Vec);
@@ -434,7 +421,7 @@ namespace art {
         return info;
     }
 
-    void* FrameResult::init(uint8_t*& frame, CodeHolder* code, const char* symbol_name, const char* file_path) {
+    void* FrameResult::init(uint8_t*& frame, CodeHolder* code, list_array<art::frame_info::line_info>& line_infos, const char* symbol_name, const char* file_path) {
         std::vector<uint16_t> unwindInfo = convert(*this);
         size_t unwindInfoSize = unwindInfo.size() * sizeof(uint16_t);
 
@@ -464,6 +451,7 @@ namespace art {
         tmp.fun_size = fun_size;
         tmp.name = symbol_name;
         tmp.file = file_path;
+        tmp.line_infos = line_infos;
         return baseaddr;
     }
 
@@ -590,19 +578,6 @@ namespace art {
         }
     };
 
-    size_t JITPCToLine(uint8_t* pc, const frame_info* info) {
-        //int PCIndex = int(pc - ((uint8_t*)(info->start)));
-        //if(info->LineInfo.Size() == 1) return info->LineInfo[0].LineNumber;
-        //for (unsigned i = 1; i < info->LineInfo.Size(); i++)
-        //{
-        //	if(info->LineInfo[i].InstructionIndex >= PCIndex)
-        //	{
-        //		return info->LineInfo[i - 1].LineNumber;
-        //	}
-        //}
-        return SIZE_MAX;
-    }
-
     uint32_t CaptureStackTrace(uint32_t max_frames, void** out_frames) {
         if (max_frames != (int32_t)max_frames)
             return 0;
@@ -638,7 +613,7 @@ namespace art {
             ffi.data);
     }
 
-    void* FrameResult::init(uint8_t*& frame, CodeHolder* code, const char* symbol_name, const char* file_path) {
+    void* FrameResult::init(uint8_t*& frame, CodeHolder* code, list_array<art::frame_info::line_info>& line_infos, const char* symbol_name, const char* file_path) {
         uint8_t* baseaddr;
         DWARF unwindInfo = build_dwarf(prolog_data, use_handle, exHandleOff);
         unwindInfo.data.commit();
@@ -665,6 +640,7 @@ namespace art {
         tmp.fun_size = fun_size;
         tmp.name = symbol_name;
         tmp.file = file_path;
+        tmp.line_infos = line_infos;
         frame = fde;
         return baseaddr;
     }
@@ -678,13 +654,27 @@ namespace art {
     };
 #endif
 
+    std::pair<size_t, size_t> JITPCToLine(uint8_t* pc, const frame_info* info, uint8_t* function_begin) {
+        uint64_t PCIndex = uint64_t(pc - function_begin);
+        for (auto& line_info : info->line_infos)
+            if (line_info.offset_begin >= PCIndex && line_info.offset_end <= PCIndex)
+                return {line_info.abstracted.line, line_info.abstracted.column};
+        return {SIZE_MAX, SIZE_MAX};
+    }
 
     StackTraceItem JitGetStackFrameName(NativeSymbolResolver* nativeSymbols, void* pc) {
         if (!attacha_environment::get_code_gen().frame_symbols.destroyed) {
             for (auto& it : attacha_environment::get_code_gen().frame_symbols.map) {
                 auto& info = it.second;
-                if (pc >= it.first && pc < (it.first + info.fun_size))
-                    return {info.name, info.file, JITPCToLine((uint8_t*)pc, &info)};
+                if (pc >= it.first && pc < (it.first + info.fun_size)) {
+                    auto&& [line, column] = JITPCToLine((uint8_t*)pc, &info, it.first);
+                    return {
+                        info.name,
+                        info.file,
+                        line,
+                        column
+                    };
+                }
             }
         }
         return nativeSymbols ? nativeSymbols->GetName(pc) : StackTraceItem("UNDEFINED", "UNDEFINED", SIZE_MAX);

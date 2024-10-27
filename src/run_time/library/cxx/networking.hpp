@@ -51,7 +51,7 @@ namespace art {
 
     class TcpNetworkStream {
     public:
-        virtual ~TcpNetworkStream() noexcept(false){};
+        virtual ~TcpNetworkStream() noexcept(false) {};
         virtual ValueItem read_available_ref() = 0;
         virtual ValueItem read_available(char* buffer, int buffer_len) = 0;
         virtual bool data_available() = 0;

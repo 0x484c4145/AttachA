@@ -10,8 +10,9 @@
 #include <util/enum_class.hpp>
 #include <util/ustring.hpp>
 #ifdef _WIN64
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+    #define WIN32_LEAN_AND_MEAN
+    #define NOMINMAX
+    #include <Windows.h>
 #endif
 
 namespace art {
@@ -47,7 +48,7 @@ namespace art {
 #endif
         } else {
             art::ustring result;
-            size_t found = ex.ty_arr.find_it([&inner_exception, &result](const CXXExInfo::Tys& ty) {
+            size_t found = ex.ty_arr.find_if([&inner_exception, &result](const CXXExInfo::Tys& ty) {
                 if (*ty.ty_info == typeid(AttachARuntimeException)) {
                     result = "\n" + ((AttachARuntimeException*)getExPtrFromException(inner_exception))->full_info();
                     return true;
@@ -74,21 +75,28 @@ namespace art {
     InternalException::InternalException(const art::ustring& msq)
         : AttachARuntimeException(msq) {
         auto tmp_trace = FrameResult::JitCaptureStackChainTrace();
-        stack_trace = {tmp_trace.begin(), tmp_trace.end()};
+        stack_trace = list_array<void*>(tmp_trace.begin(), tmp_trace.end());
     }
 
     InternalException::InternalException(const art::ustring& msq, std::exception_ptr inner_exception)
         : AttachARuntimeException(msq, inner_exception) {
         auto tmp_trace = FrameResult::JitCaptureStackChainTrace();
-        stack_trace = {tmp_trace.begin(), tmp_trace.end()};
+        stack_trace = list_array<void*>(tmp_trace.begin(), tmp_trace.end());
     }
 
     art::ustring InternalException::full_info() const {
         art::ustring result = AttachARuntimeException::full_info();
         result += "\nStackTrace:";
         for (auto& frame : stack_trace) {
-            auto r_frame = FrameResult::JitResolveFrame(frame);
-            result += "\n\t" + r_frame.fn_name + ": " + std::to_string(r_frame.line);
+            StackTraceItem r_frame = FrameResult::JitResolveFrame(frame);
+            std::string stringize_frame = "\n\t" + r_frame.fn_name;
+            if (r_frame.line != StackTraceItem::nline) {
+                stringize_frame += ": " + std::to_string(r_frame.line);
+                if (r_frame.column != StackTraceItem::ncolumn) {
+                    stringize_frame += "[" + std::to_string(r_frame.column) + "]";
+                }
+            }
+            stringize_frame += stringize_frame;
         }
         return result;
     }

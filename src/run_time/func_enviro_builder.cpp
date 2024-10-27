@@ -495,12 +495,10 @@ void FuncEnviroBuilder::_static_arr::push_start(ValueIndexPos val, bool move) {
     builder::writeIndexPos(build.code, val);
 }
 
-void FuncEnviroBuilder::_static_arr::insert_range(ValueIndexPos arr2, ValueIndexPos arr2_start, ValueIndexPos arr2_end, ValueIndexPos arr_pos, bool move) {
+void FuncEnviroBuilder::_static_arr::insert_range(ValueIndexPos arr2, ValueIndexPos arr_pos, bool move) {
     default_static_header_arr_op(build.code, arr, arr_meta, move);
     build.code.push_back((uint8_t)OpcodeArray::insert_range);
     builder::writeIndexPos(build.code, arr2);
-    builder::writeIndexPos(build.code, arr2_start);
-    builder::writeIndexPos(build.code, arr2_end);
     builder::writeIndexPos(build.code, arr_pos);
 }
 
@@ -651,12 +649,10 @@ void FuncEnviroBuilder::_arr::push_start(ValueIndexPos val, bool move) {
     builder::writeIndexPos(build.code, val);
 }
 
-void FuncEnviroBuilder::_arr::insert_range(ValueIndexPos arr2, ValueIndexPos arr2_start, ValueIndexPos arr2_end, ValueIndexPos arr_pos, bool move) {
+void FuncEnviroBuilder::_arr::insert_range(ValueIndexPos arr2, ValueIndexPos arr_pos, bool move) {
     default_dynamic_header_arr_op(build.code, arr, move);
     build.code.push_back((uint8_t)OpcodeArray::insert_range);
     builder::writeIndexPos(build.code, arr2);
-    builder::writeIndexPos(build.code, arr2_start);
-    builder::writeIndexPos(build.code, arr2_end);
     builder::writeIndexPos(build.code, arr_pos);
 }
 
@@ -922,6 +918,191 @@ void FuncEnviroBuilder::set_interface_value(ClassAccess access, ValueIndexPos cl
     builder::writeIndexPos(code, set_val);
 }
 
+void FuncEnviroBuilder::call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = false;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::write(code, access);
+}
+
+void FuncEnviroBuilder::call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, ValueIndexPos res_val, ValueMeta res_meta, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::write(code, access);
+    builder::writeIndexPos(code, res_val);
+    builder::write(code, res_meta);
+}
+
+void FuncEnviroBuilder::call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function_id, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = false;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, ValueIndexPos res_val, ValueMeta res_meta, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function_id, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::writeIndexPos(code, res_val);
+    builder::write(code, res_meta);
+}
+
+void FuncEnviroBuilder::call_value_interface_and_ret(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function_and_ret, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::call_value_interface_id_and_ret(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async) {
+    builder::write(code, Command(Opcode::call_value_function_id_and_ret, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::static_call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = false;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::write(code, access);
+}
+
+void FuncEnviroBuilder::static_call_value_interface(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, ValueIndexPos res_val, ValueMeta res_meta, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::write(code, access);
+    builder::writeIndexPos(code, res_val);
+    builder::write(code, res_meta);
+}
+
+void FuncEnviroBuilder::static_call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function_id, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = false;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::static_call_value_interface_id(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, ValueIndexPos res_val, ValueMeta res_meta, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function_id, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = false;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::writeIndexPos(code, res_val);
+    builder::write(code, res_meta);
+}
+
+void FuncEnviroBuilder::static_call_value_interface_and_ret(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos fn_name, ValueMeta fn_name_meta, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function_and_ret, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::writeIndexPos(code, fn_name);
+    builder::write(code, fn_name_meta);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::static_call_value_interface_id_and_ret(ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, uint64_t class_fun_id, bool is_async) {
+    builder::write(code, Command(Opcode::static_call_value_function_id_and_ret, false, true));
+    CallFlags f;
+    f.async_mode = is_async;
+    f.use_result = true;
+    code.push_back(f.encoded);
+    builder::write(code, class_fun_id);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::get_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos val_name, ValueIndexPos res, ValueMeta res_meta) {
+    builder::write(code, Command(Opcode::get_structure_value, false, true));
+    builder::writeIndexPos(code, val_name);
+    builder::write(code, access);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::writeIndexPos(code, res);
+    builder::write(code, res_meta);
+}
+
+void FuncEnviroBuilder::set_interface_value(ClassAccess access, ValueIndexPos class_val, ValueIndexPos class_name, ValueIndexPos separator, ValueIndexPos val_name, ValueIndexPos set_val, ValueMeta set_val_meta) {
+    builder::write(code, Command(Opcode::set_structure_value, false, true));
+    builder::writeIndexPos(code, val_name);
+    builder::write(code, access);
+    builder::writeIndexPos(code, class_val);
+    builder::writeIndexPos(code, class_name);
+    builder::writeIndexPos(code, separator);
+    builder::writeIndexPos(code, set_val);
+    builder::write(code, set_val_meta);
+}
+
+
 #pragma endregion
 #pragma region misc
 
@@ -1069,6 +1250,218 @@ void FuncEnviroBuilder::remove_qualifiers(ValueIndexPos res) {
     builder::writeIndexPos(code, res);
 }
 
+void FuncEnviroBuilder::global_get(ValueIndexPos from, ValueIndexPos location, ValueIndexPos separator) {
+    builder::write(code, Command(Opcode::global_get));
+    builder::writeIndexPos(code, from);
+    builder::writeIndexPos(code, location);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::global_set(ValueIndexPos to, ValueIndexPos location, ValueIndexPos separator) {
+    builder::write(code, Command(Opcode::global_get));
+    builder::writeIndexPos(code, to);
+    builder::writeIndexPos(code, location);
+    builder::writeIndexPos(code, separator);
+}
+
+void FuncEnviroBuilder::_map::set(ValueIndexPos key, ValueIndexPos val, bool move) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeMap::set);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, val);
+}
+
+void FuncEnviroBuilder::_map::get(ValueIndexPos to, ValueIndexPos key, bool move) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeMap::get);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, to);
+}
+
+void FuncEnviroBuilder::_map::remove(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::remove_item);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_map::has_key(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::contains);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_map::reserve(ValueIndexPos count) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::reserve);
+    builder::writeIndexPos(build.code, count);
+}
+
+void FuncEnviroBuilder::_map::size(ValueIndexPos to) {
+    builder::write(build.code, Command(Opcode::map_op));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::size);
+    builder::writeIndexPos(build.code, to);
+}
+
+FuncEnviroBuilder::_map FuncEnviroBuilder::map(ValueIndexPos map) {
+    return _map(*this, map);
+}
+
+void FuncEnviroBuilder::_static_map::set(ValueIndexPos key, ValueIndexPos val, bool move) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeMap::set);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, val);
+}
+
+void FuncEnviroBuilder::_static_map::get(ValueIndexPos to, ValueIndexPos key, bool move) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeMap::get);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, to);
+}
+
+void FuncEnviroBuilder::_static_map::remove(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::remove_item);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_static_map::has_key(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::contains);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_static_map::reserve(ValueIndexPos count) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::reserve);
+    builder::writeIndexPos(build.code, count);
+}
+
+void FuncEnviroBuilder::_static_map::size(ValueIndexPos to) {
+    builder::write(build.code, Command(Opcode::map_op, false, true));
+    builder::writeIndexPos(build.code, map);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeMap::size);
+    builder::writeIndexPos(build.code, to);
+}
+
+FuncEnviroBuilder::_static_map FuncEnviroBuilder::static_map(ValueIndexPos map) {
+    return _static_map(*this, map);
+}
+
+void FuncEnviroBuilder::_set::set(ValueIndexPos key, ValueIndexPos val, bool move) {
+    builder::write(build.code, Command(Opcode::set_op));
+    builder::writeIndexPos(build.code, set_);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeSet::set);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, val);
+}
+
+void FuncEnviroBuilder::_set::remove(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::set_op));
+    builder::writeIndexPos(build.code, set_);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::remove_item);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_set::has_key(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::set_op));
+    builder::writeIndexPos(build.code, set_);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::contains);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_set::reserve(ValueIndexPos count) {
+    builder::write(build.code, Command(Opcode::set_op));
+    builder::writeIndexPos(build.code, set_);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::reserve);
+    builder::writeIndexPos(build.code, count);
+}
+
+void FuncEnviroBuilder::_set::size(ValueIndexPos to) {
+    builder::write(build.code, Command(Opcode::set_op));
+    builder::writeIndexPos(build.code, set_);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::size);
+    builder::writeIndexPos(build.code, to);
+}
+
+FuncEnviroBuilder::_set FuncEnviroBuilder::set(ValueIndexPos set) {
+    return _set(*this, set);
+}
+
+void FuncEnviroBuilder::_static_set::set(ValueIndexPos key, ValueIndexPos val, bool move) {
+    builder::write(build.code, Command(Opcode::set_op, false, true));
+    builder::writeIndexPos(build.code, _set);
+    builder::write(build.code, move);
+    builder::write(build.code, (uint8_t)OpcodeSet::set);
+    builder::writeIndexPos(build.code, key);
+    builder::writeIndexPos(build.code, val);
+}
+
+void FuncEnviroBuilder::_static_set::remove(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::set_op, false, true));
+    builder::writeIndexPos(build.code, _set);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::remove_item);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_static_set::has_key(ValueIndexPos key) {
+    builder::write(build.code, Command(Opcode::set_op, false, true));
+    builder::writeIndexPos(build.code, _set);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::contains);
+    builder::writeIndexPos(build.code, key);
+}
+
+void FuncEnviroBuilder::_static_set::reserve(ValueIndexPos count) {
+    builder::write(build.code, Command(Opcode::set_op, false, true));
+    builder::writeIndexPos(build.code, _set);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::reserve);
+    builder::writeIndexPos(build.code, count);
+}
+
+void FuncEnviroBuilder::_static_set::size(ValueIndexPos to) {
+    builder::write(build.code, Command(Opcode::set_op, false, true));
+    builder::writeIndexPos(build.code, _set);
+    builder::write(build.code, false);
+    builder::write(build.code, (uint8_t)OpcodeSet::size);
+    builder::writeIndexPos(build.code, to);
+}
+
+FuncEnviroBuilder::_static_set FuncEnviroBuilder::static_set(ValueIndexPos set) {
+    return _static_set(*this, set);
+}
+
 #pragma endregion
 #pragma region except
 
@@ -1214,6 +1607,16 @@ art::shared_ptr<FuncEnvironment> FuncEnviroBuilder::O_prepare_func() {
             builder::write(fn, values);
         if (flags.used_arguments)
             builder::write(fn, args_values);
+        if (flags.has_debug_info) {
+            builder::writeString(fn, file_local_path);
+            builder::writePackedLen(fn, line_info.size());
+            for (auto& it : line_info) {
+                builder::writePackedLen(fn, it.begin);
+                builder::writePackedLen(fn, it.end);
+                builder::writePackedLen(fn, it.line);
+                builder::writePackedLen(fn, it.column);
+            }
+        }
         builder::writePackedLen(fn, constants_values);
 
         builder::writePackedLen(fn, jump_pos.size());
@@ -1303,14 +1706,20 @@ FuncEnviroBuilder& FuncEnviroBuilder::O_flag_is_patchable(bool is_patchable) {
     return *this;
 }
 
-FuncEnviroBuilder_line_info FuncEnviroBuilder::O_line_info_begin() {
-    FuncEnviroBuilder_line_info ret;
-    ret.begin = code.size();
+art::line_info FuncEnviroBuilder::O_line_info_begin() {
+    art::line_info ret;
+    ret.begin = internal_jump();
     return ret;
 }
 
-void FuncEnviroBuilder::O_line_info_end(FuncEnviroBuilder_line_info line_info) {
-    //TODO: add line info
+void FuncEnviroBuilder::O_line_info_end(art::line_info line_info) {
+    if (line_info.begin == -1)
+        throw CompileTimeException("Invalid line info.");
+    if (!is_internal_jump(line_info.begin))
+        throw CompileTimeException("Unbound line info.");
+    line_info.end = internal_jump();
+    this->line_info.push_back(std::move(line_info));
+    flags.has_debug_info = true;
 }
 
 std::vector<uint8_t> FuncEnviroBuilder::O_build_func() {
@@ -1327,6 +1736,16 @@ std::vector<uint8_t> FuncEnviroBuilder::O_build_func() {
         builder::write(fn, values);
     if (flags.used_arguments)
         builder::write(fn, args_values);
+    if (flags.has_debug_info) {
+        builder::writeString(fn, file_local_path);
+        builder::writePackedLen(fn, line_info.size());
+        for (auto& it : line_info) {
+            builder::writePackedLen(fn, it.begin);
+            builder::writePackedLen(fn, it.end);
+            builder::writePackedLen(fn, it.line);
+            builder::writePackedLen(fn, it.column);
+        }
+    }
     builder::writePackedLen(fn, constants_values);
 
 

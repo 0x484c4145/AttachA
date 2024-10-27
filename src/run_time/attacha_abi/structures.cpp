@@ -364,7 +364,7 @@ namespace art {
                 if (!item.inlined)
                     delete static_value_get<list_array<ValueItem>*>(ptr, item.offset, item.bit_used, item.bit_offset);
                 else {
-                    static_value_get<list_array<ValueItem>*>(ptr, item.offset, item.bit_used, item.bit_offset)->~list_array<ValueItem>();
+                    static_value_get<list_array<ValueItem>*>(ptr, item.offset, item.bit_used, item.bit_offset)->~list_array();
                 }
                 break;
             case VType::string:
@@ -590,7 +590,7 @@ namespace art {
 #pragma endregion
 #pragma region AttachAVirtualTable
 
-    AttachAVirtualTable::AttachAVirtualTable(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy) {
+    AttachAVirtualTable::AttachAVirtualTable(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, art::shared_ptr<FuncEnvironment> constructor, size_t structure_bytes, bool allow_auto_copy) {
         this->destructor = destructor ? (Environment)destructor->get_func_ptr() : nullptr;
         this->copy = copy ? (Environment)copy->get_func_ptr() : nullptr;
         this->move = move ? (Environment)move->get_func_ptr() : nullptr;
@@ -610,10 +610,10 @@ namespace art {
             new (values_table + i) ValueInfo(values[i]);
 
         auto tmp = getAfterMethods();
-        new (tmp) AfterMethods{"", {}, nullptr, destructor, copy, move, compare};
+        new (tmp) AfterMethods{"", {}, nullptr, destructor, copy, move, compare, constructor};
     }
 
-    AttachAVirtualTable* AttachAVirtualTable::create(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy) {
+    AttachAVirtualTable* AttachAVirtualTable::create(list_array<MethodInfo>& methods, list_array<ValueInfo>& values, art::shared_ptr<FuncEnvironment> destructor, art::shared_ptr<FuncEnvironment> copy, art::shared_ptr<FuncEnvironment> move, art::shared_ptr<FuncEnvironment> compare, size_t structure_bytes, bool allow_auto_copy, art::shared_ptr<FuncEnvironment> constructor) {
         size_t to_allocate =
             sizeof(AttachAVirtualTable)            //
             + sizeof(Environment) * methods.size() //
@@ -625,7 +625,7 @@ namespace art {
         AttachAVirtualTable* table = (AttachAVirtualTable*)malloc(to_allocate);
         if (!table)
             throw std::bad_alloc();
-        new (table) AttachAVirtualTable(methods, values, destructor, copy, move, compare, structure_bytes, allow_auto_copy);
+        new (table) AttachAVirtualTable(methods, values, destructor, copy, move, compare, constructor, structure_bytes, allow_auto_copy);
         return table;
     }
 
@@ -909,7 +909,6 @@ namespace art {
     }
 
 #pragma endregion
-
 #pragma endregion
 
 #pragma region AttachADynamicVirtualTable
@@ -1035,7 +1034,7 @@ namespace art {
         for (uint64_t i = 0; i < methods.size(); i++)
             if (methods[i].deletable)
                 if (methods[i].name == name && Structure::checkAccess(methods[i].access, access)) {
-                    methods.remove(i);
+                    methods.erase(i);
                     return;
                 }
     }
@@ -1044,9 +1043,9 @@ namespace art {
         for (MethodInfo& info : parent.methods) {
             size_t i;
             if (!as_friend)
-                i = methods.find_it([&info](const MethodInfo& f_info) { return f_info.name == info.name && Structure::checkAccess(f_info.access, info.access); });
+                i = methods.find_if([&info](const MethodInfo& f_info) { return f_info.name == info.name && Structure::checkAccess(f_info.access, info.access); });
             else
-                i = methods.find_it([&info](const MethodInfo& f_info) { return f_info.name == info.name; });
+                i = methods.find_if([&info](const MethodInfo& f_info) { return f_info.name == info.name; });
             if (i == list_array<MethodInfo>::npos)
                 methods.push_back(info);
             else if (!methods[i].deletable)
@@ -1062,9 +1061,9 @@ namespace art {
         for (size_t i = 0; i < size; i++) {
             size_t j;
             if (!as_friend)
-                j = this->methods.find_it([&methods, i](const MethodInfo& info) { return info.name == methods[i].name && Structure::checkAccess(info.access, methods[i].access); });
+                j = this->methods.find_if([&methods, i](const MethodInfo& info) { return info.name == methods[i].name && Structure::checkAccess(info.access, methods[i].access); });
             else
-                j = this->methods.find_it([&methods, i](const MethodInfo& info) { return info.name == methods[i].name; });
+                j = this->methods.find_if([&methods, i](const MethodInfo& info) { return info.name == methods[i].name; });
             if (j == list_array<MethodInfo>::npos)
                 this->methods.push_back(methods[i]);
             else if (!this->methods[j].deletable)
@@ -1097,7 +1096,7 @@ namespace art {
             return;
         for (uint64_t i = 0; i < tags->size(); i++)
             if ((*tags)[i].name == name) {
-                tags->remove(i);
+                tags->erase(i);
                 return;
             }
     }
@@ -1198,7 +1197,7 @@ namespace art {
     void AttachADynamicVirtualTable::removeValue(const art::ustring& name, ClassAccess access) {
         for (uint64_t i = 0; i < values.size(); i++)
             if (values[i].name == name && Structure::checkAccess(values[i].access, access)) {
-                values.remove(i);
+                values.erase(i);
                 return;
             }
     }
@@ -1221,9 +1220,9 @@ namespace art {
         for (ValueInfo& value : parent.values) {
             size_t i;
             if (!as_friend)
-                i = values.find_it([&value](const ValueInfo& f_value) { return f_value.name == value.name && Structure::checkAccess(f_value.access, value.access); });
+                i = values.find_if([&value](const ValueInfo& f_value) { return f_value.name == value.name && Structure::checkAccess(f_value.access, value.access); });
             else
-                i = values.find_it([&value](const ValueInfo& f_value) { return f_value.name == value.name; });
+                i = values.find_if([&value](const ValueInfo& f_value) { return f_value.name == value.name; });
 
             if (i == list_array<ValueInfo>::npos)
                 this->values.push_back(value);
@@ -1238,9 +1237,9 @@ namespace art {
         for (uint64_t i = 0; i < total_values; i++) {
             size_t j;
             if (!as_friend)
-                j = this->values.find_it([&values, i](const ValueInfo& f_value) { return f_value.name == values[i].name && Structure::checkAccess(f_value.access, values[i].access); });
+                j = this->values.find_if([&values, i](const ValueInfo& f_value) { return f_value.name == values[i].name && Structure::checkAccess(f_value.access, values[i].access); });
             else
-                j = this->values.find_it([&values, i](const ValueInfo& f_value) { return f_value.name == values[i].name; });
+                j = this->values.find_if([&values, i](const ValueInfo& f_value) { return f_value.name == values[i].name; });
 
             if (j == list_array<ValueInfo>::npos)
                 this->values.push_back(values[i]);
@@ -1890,6 +1889,147 @@ namespace art {
 
 #pragma endregion
 
+
+#pragma endregion
+
+#pragma region VirtualTable
+
+    //
+    //enum class VTableMode : uint8_t {
+    //    AttachAVirtualTable = 0,
+    //    AttachADynamicVirtualTable = 1, //destructor will delete the vtable
+    //    ___unused = 2,
+    //    undefined = 3
+    //};
+    //struct VirtualTable {
+    //    union {
+    //        AttachAVirtualTable* regular;
+    //        AttachADynamicVirtualTable* dynamic;
+    //    };
+    //
+    //    Structure::VTableMode mode;
+    //    bool is_reference : 1;
+    //
+    //    VirtualTable(nullptr_t);
+    //    VirtualTable(AttachAVirtualTable* vt);
+    //    VirtualTable(AttachADynamicVirtualTable* vt);
+    //    VirtualTable(VirtualTable&&);
+    //    VirtualTable(const VirtualTable&);
+    //    ~VirtualTable();
+    //
+    //    VirtualTable& operator=(VirtualTable&&);
+    //    VirtualTable& operator=(const VirtualTable&);
+    //
+    //    void destroy();
+    //};
+    VirtualTable::VirtualTable() {
+        mode = Structure::VTableMode::undefined;
+    }
+    
+    VirtualTable::VirtualTable(nullptr_t) {
+        mode = Structure::VTableMode::undefined;
+    }
+
+    VirtualTable::VirtualTable(AttachAVirtualTable* vt) {
+        regular = vt;
+        mode = Structure::VTableMode::AttachAVirtualTable;
+        is_reference = false;
+    }
+
+    VirtualTable::VirtualTable(AttachADynamicVirtualTable* vt) {
+        dynamic = vt;
+        mode = Structure::VTableMode::AttachADynamicVirtualTable;
+        is_reference = false;
+    }
+
+    VirtualTable::VirtualTable(VirtualTable&& other) {
+        mode = other.mode;
+        switch (mode) {
+        case Structure::VTableMode::AttachAVirtualTable:
+            regular = other.regular;
+            break;
+        case Structure::VTableMode::AttachADynamicVirtualTable:
+            dynamic = other.dynamic;
+            break;
+        default:
+            break;
+        }
+        other.mode = Structure::VTableMode::undefined;
+        is_reference = false;
+    }
+
+    VirtualTable::VirtualTable(const VirtualTable& other) {
+        mode = other.mode;
+        switch (mode) {
+        case Structure::VTableMode::AttachAVirtualTable:
+            regular = other.regular;
+            break;
+        case Structure::VTableMode::AttachADynamicVirtualTable:
+            dynamic = other.dynamic;
+            break;
+        default:
+            break;
+        }
+        is_reference = true;
+    }
+
+    VirtualTable::~VirtualTable() {
+        destroy();
+    }
+
+    VirtualTable& VirtualTable::operator=(VirtualTable&& other) {
+        if (this->regular == other.regular)
+            return *this;
+        destroy();
+        mode = other.mode;
+        switch (mode) {
+        case Structure::VTableMode::AttachAVirtualTable:
+            regular = other.regular;
+            break;
+        case Structure::VTableMode::AttachADynamicVirtualTable:
+            dynamic = other.dynamic;
+            break;
+        default:
+            break;
+        }
+        other.mode = Structure::VTableMode::undefined;
+        is_reference = other.is_reference;
+        return *this;
+    }
+
+    VirtualTable& VirtualTable::operator=(const VirtualTable& other) {
+        if (this->regular == other.regular)
+            return *this;
+        destroy();
+        mode = other.mode;
+        switch (mode) {
+        case Structure::VTableMode::AttachAVirtualTable:
+            regular = other.regular;
+            break;
+        case Structure::VTableMode::AttachADynamicVirtualTable:
+            dynamic = other.dynamic;
+            break;
+        default:
+            break;
+        }
+        is_reference = true;
+        return *this;
+    }
+
+    void VirtualTable::destroy() {
+        if (!is_reference)
+            switch (mode) {
+            case Structure::VTableMode::AttachAVirtualTable:
+                break;
+            case Structure::VTableMode::AttachADynamicVirtualTable:
+                delete dynamic;
+                break;
+            default:
+                break;
+            }
+        mode = Structure::VTableMode::undefined;
+        is_reference = false;
+    }
 
 #pragma endregion
 }

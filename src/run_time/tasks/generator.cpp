@@ -4,11 +4,11 @@
 // (See accompanying file LICENSE or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#include <run_time/ValueEnvironment.hpp>
 #include <run_time/asm/FuncEnvironment.hpp>
 #include <run_time/tasks.hpp>
 #include <run_time/tasks/_internal.hpp>
 #include <run_time/tasks/util/light_stack.hpp>
+#include <run_time/values_global.hpp>
 
 namespace art {
     void prepare_generator(ValueItem& set_args, art::shared_ptr<FuncEnvironment>& func, art::shared_ptr<FuncEnvironment>& ex_handler, Generator*& weak_ref) {
@@ -25,8 +25,11 @@ namespace art {
         } else
             args_list.push_back(std::move(args));
 
-        size_t len = 0;
-        ValueItem* extracted = args_list.take_raw(len);
+        size_t len = args_list.size();
+        ValueItem* extracted = new ValueItem[len];
+        args_list.take().for_each([&](size_t index, ValueItem&& it) {
+            extracted[index] = std::move(it);
+        });
         set_args = ValueItem(extracted, len, no_copy);
         loc.on_load_generator_ref = nullptr;
     }
@@ -66,7 +69,7 @@ namespace art {
     Generator::Generator(art::shared_ptr<FuncEnvironment> call_func, const ValueItem& arguments, bool used_generator_local, art::shared_ptr<FuncEnvironment> exception_handler)
         : args(arguments), func(call_func), ex_handle(exception_handler) {
         if (used_generator_local)
-            _generator_local = new ValueEnvironment();
+            _generator_local = new values_global();
         else
             _generator_local = nullptr;
     }
@@ -74,7 +77,7 @@ namespace art {
     Generator::Generator(art::shared_ptr<FuncEnvironment> call_func, ValueItem&& arguments, bool used_generator_local, art::shared_ptr<FuncEnvironment> exception_handler)
         : args(std::move(arguments)), func(call_func), ex_handle(exception_handler) {
         if (used_generator_local)
-            _generator_local = new ValueEnvironment();
+            _generator_local = new values_global();
         else
             _generator_local = nullptr;
     }
@@ -216,7 +219,7 @@ namespace art {
             throw InvalidOperation("Generator already in use");
     }
 
-    class ValueEnvironment* Generator::generator_local(Generator* generator_weak_ref) {
+    class values_global* Generator::generator_local(Generator* generator_weak_ref) {
         return generator_weak_ref->_generator_local;
     }
 

@@ -41,7 +41,7 @@ namespace art {
         art::ustring path = "\1. " + std::to_string((size_t)ptr);
         auto& tmp = fn_glob.funs[path];
         if (tmp)
-            throw SymbolException("Fail allocate symbol: \"" + path + "\" cause them already exists");
+            throw SymbolException("Fail allocate symbol: \"" + path + "\" because its already exists");
         tmp = art::shared_ptr<FuncEnvironment>(ptr);
         return tmp;
     }
@@ -103,7 +103,7 @@ namespace art {
     FuncHandle::inner_handle::inner_handle(void* func, void* clean_up, FuncHandle::ProxyFunction proxy_func, bool is_cheap)
         : is_cheap(is_cheap) {
         _type = FuncType::static_native_c;
-        values.reserve_push_back(2);
+        values.reserve_back(2);
         values.push_back(func);
         values.push_back(clean_up);
         frame = (uint8_t*)proxy_func;
@@ -181,9 +181,9 @@ namespace art {
         if (header.flags.run_time_computable) {
             //local_funcs already contains all local functions
             if (values.size() > to_alloc_statics)
-                values.remove(to_alloc_statics, values.size());
+                values.erase(to_alloc_statics, values.size());
             else {
-                values.reserve_push_front(to_alloc_statics - values.size());
+                values.reserve_front(to_alloc_statics - values.size());
                 for (uint32_t i = values.size(); i < to_alloc_statics; i++)
                     values.push_front(nullptr);
             }
@@ -192,14 +192,14 @@ namespace art {
             values.resize(to_alloc_statics, nullptr);
         }
         header.constants_values += to_alloc_statics;
-        values.reserve_push_back(std::clamp<uint32_t>(header.constants_values, 0, UINT32_MAX));
+        values.reserve_back(std::clamp<uint32_t>(header.constants_values, 0, UINT32_MAX));
         uint32_t max_values = header.flags.used_enviro_vals ? uint32_t(header.used_enviro_vals) + 1 : 0;
 
 
         //OS dependent prolog begin
         size_t is_patchable_exception_finalizer = 0;
         if (header.flags.is_patchable) {
-            a.atomic_increase(&ref_count); //increase usage count
+            a.atomic_increase((void*)&ref_count); //increase usage count
             is_patchable_exception_finalizer = scope.createExceptionScope();
             auto self = this;
             scope.setExceptionFinal(is_patchable_exception_finalizer, _inner_handle_finalizer, &self, sizeof(self));
@@ -270,7 +270,7 @@ namespace art {
         if (header.flags.is_patchable) {
             scope.endExceptionScope(is_patchable_exception_finalizer);
             a.mov(argr0, -1);
-            a.atomic_fetch_add(&ref_count, argr0);
+            a.atomic_fetch_add((void*)&ref_count, argr0);
             a.cmp(argr0, 1); //if old ref_count == 1
 
             Label last_usage = a.newLabel();
@@ -291,10 +291,18 @@ namespace art {
         a.jmp((size_t)exception::__get_internal_handler());
         a.finalize();
         auto resolved_frame = try_resolve_frame(this);
-        env = (Environment)tmp.init(frame, a.code(), resolved_frame.data());
+        auto line_info = header.line_info.convert<art::frame_info::line_info>([&](const art::line_info& source) {
+            return art::frame_info::line_info{
+                compiler.label_offset(compiler.resolve_label(source.begin)),
+                compiler.label_offset(compiler.resolve_label(source.end)),
+                source
+            };
+        });
+
+        env = (Environment)tmp.init(frame, a.code(), line_info, resolved_frame.data(), header.file_local_path.empty() ? nullptr : header.file_local_path.c_str());
         //remove self from used_environs
         auto my_trampoline = parent ? parent->get_trampoline_code() : nullptr;
-        used_environs.remove_if([my_trampoline](art::shared_ptr<FuncEnvironment>& a) { return a->get_func_ptr() == my_trampoline; });
+        used_environs.remove_if([my_trampoline](const art::shared_ptr<FuncEnvironment>& a) { return a->get_func_ptr() == my_trampoline; });
     }
 
     ValueItem* FuncHandle::inner_handle::dynamic_call_helper(ValueItem* arguments, uint32_t arguments_size) {
@@ -565,7 +573,7 @@ namespace art {
         auto& fn_glob = attacha_environment::get_function_globals();
         art::lock_guard guard(fn_glob.lock);
         if (fn_glob.funs.contains(symbol_name))
-            throw SymbolException("Fail allocate symbol: \"" + symbol_name + "\" cause them already exists");
+            throw SymbolException("Fail allocate symbol: \"" + symbol_name + "\" because its already exists");
         auto symbol = new FuncHandle::inner_handle(function, is_cheap);
         fn_glob.funs[symbol_name] = new FuncEnvironment(symbol, can_be_unloaded);
     }
@@ -583,7 +591,7 @@ namespace art {
         if (found != fn_glob.funs.end()) {
             if (found->second->func_ != nullptr)
                 if (found->second->func_->handle != nullptr)
-                    throw SymbolException("Fail load symbol: \"" + symbol_name + "\" cause them already exists");
+                    throw SymbolException("Fail load symbol: \"" + symbol_name + "\" because its already exists");
             found->second = fn;
         } else
             fn_glob.funs[symbol_name] = fn;
@@ -595,7 +603,7 @@ namespace art {
         auto found = fn_glob.funs.find(func_name);
         if (found != fn_glob.funs.end()) {
             if (!found->second->can_be_unloaded)
-                throw SymbolException("Fail unload symbol: \"" + func_name + "\" cause them can't be unloaded");
+                throw SymbolException("Fail unload symbol: \"" + func_name + "\" because its can't be unloaded");
             fn_glob.funs.erase(found);
         }
     }

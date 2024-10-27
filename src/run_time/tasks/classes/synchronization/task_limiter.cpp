@@ -118,7 +118,7 @@ namespace art {
         if (!lock_check.contains(&*loc.curr_task))
             throw InvalidUnlock("Invalid unlock. Task try unlock already unlocked task limiter");
         else
-            lock_check.erase(&*loc.curr_task);
+            lock_check.remove(&*loc.curr_task);
         unchecked_unlock();
     }
 

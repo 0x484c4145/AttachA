@@ -5,13 +5,13 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #include <base/run_time.hpp>
-#include <run_time/ValueEnvironment.hpp>
 #include <run_time/asm/FuncEnvironment.hpp>
 #include <run_time/asm/exception.hpp>
 #include <run_time/tasks.hpp>
 #include <run_time/tasks/_internal.hpp>
 #include <run_time/tasks/util/interrupt.hpp>
 #include <run_time/tasks/util/light_stack.hpp>
+#include <run_time/values_global.hpp>
 #include <util/cxxException.hpp>
 #include <util/exceptions.hpp>
 
@@ -381,7 +381,7 @@ namespace art {
         loc.is_task_thread = false;
         caught_ex = false;
         try {
-            if (loc.curr_task->_task_local == (ValueEnvironment*)-1) {
+            if (loc.curr_task->_task_local == (values_global*)-1) {
                 worker_mode_desk(old_name, " executing callback")
                     task_callback::start(*loc.curr_task);
             } else {
@@ -410,7 +410,7 @@ namespace art {
         bool pseudo_handle_caught_ex = false;
         if (!loc.curr_task->func)
             return true;
-        if (loc.curr_task->_task_local == (ValueEnvironment*)-1 || loc.curr_task->func->isCheap()) {
+        if (loc.curr_task->_task_local == (values_global*)-1 || loc.curr_task->func->isCheap()) {
             pseudo_task_handle(old_name, pseudo_handle_caught_ex);
             if (pseudo_handle_caught_ex)
                 goto caught_ex;

@@ -244,16 +244,6 @@
             }
             [insert_range] {
                 (from_id:uint16_t)// determines the array to be inserted
-                [flags.by_val_mode] true{
-                    (to_id:uint16_t)// determines the value that contains index to insert
-                    (from_start_id:uint16_t)// determines the value that contains index to start insert
-                    (from_end_id:uint16_t)// determines the value that contains index to end insert
-                }
-                [flags.by_val_mode] false{
-                    (to:uint64_t)// determines the index to be inserted
-                    (from_start:uint64_t)// determines the index to start insert
-                    (from_end:uint64_t)// determines the index to end insert
-                }
             }
             [get] {
                 (result_id:uint16_t)// determines the value to be set as result

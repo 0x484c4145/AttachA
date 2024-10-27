@@ -10,7 +10,8 @@
 #include <util/threading.hpp>
 
 #ifdef _WIN32
-#include <Windows.h>
+    #define NOMINMAX
+    #include <Windows.h>
 
 
 extern "C" void thread_interrupter_asm_zmm();

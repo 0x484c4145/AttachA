@@ -110,6 +110,23 @@ namespace art {
         TaskRWMutex() = default;
 
         ~TaskRWMutex();
+
+        void lock() {
+            write_lock();
+        }
+
+        void unlock() {
+            write_unlock();
+        }
+
+        void shared_lock() {
+            read_lock();
+        }
+
+        void shared_unlock() {
+            read_unlock();
+        }
+
         void read_lock();
         bool try_read_lock();
         bool try_read_lock_for(size_t milliseconds);
@@ -272,7 +289,7 @@ namespace art {
         MutexUnify relock_0;
         MutexUnify relock_1;
         MutexUnify relock_2;
-        class ValueEnvironment* _task_local = nullptr;
+        class values_global* _task_local = nullptr;
         std::chrono::high_resolution_clock::time_point timeout = std::chrono::high_resolution_clock::time_point::min();
         uint16_t awake_check = 0;
         uint16_t bind_to_worker_id = -1; //-1 - not binded
@@ -327,7 +344,7 @@ namespace art {
         static list_array<ValueItem> await_results(list_array<art::typed_lgr<Task>>& tasks);
         static void notify_cancel(art::typed_lgr<Task>& task);
         static void notify_cancel(list_array<art::typed_lgr<Task>>& tasks);
-        static class ValueEnvironment* task_local();
+        static class values_global* task_local();
         static size_t task_id();
         static void check_cancellation();
         static void self_cancel();
@@ -466,7 +483,7 @@ namespace art {
     struct TaskEnvironment {
         art::mutex no_race;
         std::list<art::typed_lgr<Task>> awake_list;
-        class ValueEnvironment* env = nullptr;
+        class values_global* env = nullptr;
         bool cancellation_token = false;
         bool disabled = false;
         size_t max_work = 0;
@@ -514,7 +531,7 @@ namespace art {
         art::shared_ptr<FuncEnvironment> ex_handle; //if ex_handle is nullptr then exception will be unrolled to caller
         art::shared_ptr<FuncEnvironment> func;
         ValueItem args;
-        class ValueEnvironment* _generator_local = nullptr;
+        class values_global* _generator_local = nullptr;
         std::exception_ptr ex_ptr = nullptr;
         void* context = nullptr;
         std::atomic_bool now_run;
@@ -556,7 +573,7 @@ namespace art {
 
 
         //in generators use
-        static class ValueEnvironment* generator_local(Generator* generator_weak_ref);
+        static class values_global* generator_local(Generator* generator_weak_ref);
         static void yield(Generator* generator_weak_ref, ValueItem* result);
         static void result(Generator* generator_weak_ref, ValueItem* result);
 
